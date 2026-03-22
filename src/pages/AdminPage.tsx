@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setRoomPassword, getAllRoomPasswords, deleteRoomPassword } from "@/store/roomPasswords";
-import { Shield, Plus, Trash2, Copy, LogOut } from "lucide-react";
+import { Shield, Plus, Trash2, Copy, LogOut, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const ADMIN_LOGIN = "Jafuis";
