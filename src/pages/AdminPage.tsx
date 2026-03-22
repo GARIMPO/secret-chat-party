@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setRoomPassword, getAllRoomPasswords, deleteRoomPassword } from "@/store/roomPasswords";
-import { Shield, Plus, Trash2, Copy, LogOut } from "lucide-react";
+import { Shield, Plus, Trash2, Copy, LogOut, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const ADMIN_LOGIN = "Jafuis";
@@ -126,6 +126,9 @@ export default function AdminPage() {
                 <p className="text-xs text-muted-foreground font-mono">Senha: {pwd}</p>
               </div>
               <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}`)} title="Entrar na sala">
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                </Button>
                 <Button variant="ghost" size="icon" onClick={() => copyLink(room)} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
