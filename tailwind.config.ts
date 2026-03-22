@@ -47,16 +47,19 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        surface: "hsl(var(--surface))",
+        chat: {
+          self: "hsl(var(--chat-bubble-self))",
+          "self-foreground": "hsl(var(--chat-bubble-self-foreground))",
+          other: "hsl(var(--chat-bubble-other))",
+          "other-foreground": "hsl(var(--chat-bubble-other-foreground))",
+          encrypted: "hsl(var(--chat-encrypted))",
+          "encrypted-foreground": "hsl(var(--chat-encrypted-foreground))",
         },
+      },
+      fontFamily: {
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       },
       borderRadius: {
         lg: "var(--radius)",
