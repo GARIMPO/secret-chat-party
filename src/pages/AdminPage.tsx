@@ -47,10 +47,11 @@ export default function AdminPage() {
     toast.success(`Sala "${room}" removida`);
   };
 
-  const copyLink = (room: string) => {
-    const url = `${window.location.origin}/chat?room=${encodeURIComponent(room)}`;
+  const copyLink = (room: string, pwd: string) => {
+    const encodedPwd = btoa(pwd);
+    const url = `${window.location.origin}/chat?room=${encodeURIComponent(room)}&key=${encodeURIComponent(encodedPwd)}`;
     navigator.clipboard.writeText(url);
-    toast.success("Link copiado!");
+    toast.success("Link copiado com senha embutida!");
   };
 
   if (!isAuthenticated) {
