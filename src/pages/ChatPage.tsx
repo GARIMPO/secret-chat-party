@@ -18,9 +18,11 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const room = searchParams.get("room");
+  const keyFromUrl = searchParams.get("key");
+  const autoPassword = keyFromUrl ? (() => { try { return atob(decodeURIComponent(keyFromUrl)); } catch { return ""; } })() : "";
 
   const [nickname, setNickname] = useState("");
-  const [roomPassword, setRoomPassword] = useState("");
+  const [roomPassword, setRoomPassword] = useState(autoPassword);
   const [joined, setJoined] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -128,7 +130,7 @@ export default function ChatPage() {
               <Lock className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-xl font-semibold text-foreground">Sala: {room}</h1>
-            <p className="text-sm text-muted-foreground">Insira seu apelido e a senha da sala</p>
+            <p className="text-sm text-muted-foreground">{autoPassword ? "Senha detectada no link. Insira seu apelido." : "Insira seu apelido e a senha da sala"}</p>
           </div>
           <div className="space-y-3">
             <Input
@@ -138,12 +140,14 @@ export default function ChatPage() {
               autoFocus
               maxLength={20}
             />
-            <Input
-              type="password"
-              placeholder="Senha da sala (para descriptografar)"
-              value={roomPassword}
-              onChange={(e) => setRoomPassword(e.target.value)}
-            />
+            {!autoPassword && (
+              <Input
+                type="password"
+                placeholder="Senha da sala (para descriptografar)"
+                value={roomPassword}
+                onChange={(e) => setRoomPassword(e.target.value)}
+              />
+            )}
           </div>
           <Button type="submit" className="w-full active:scale-[0.97]">
             Entrar na sala

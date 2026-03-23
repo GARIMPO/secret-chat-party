@@ -47,10 +47,11 @@ export default function AdminPage() {
     toast.success(`Sala "${room}" removida`);
   };
 
-  const copyLink = (room: string) => {
-    const url = `${window.location.origin}/chat?room=${encodeURIComponent(room)}`;
+  const copyLink = (room: string, pwd: string) => {
+    const encodedPwd = btoa(pwd);
+    const url = `${window.location.origin}/chat?room=${encodeURIComponent(room)}&key=${encodeURIComponent(encodedPwd)}`;
     navigator.clipboard.writeText(url);
-    toast.success("Link copiado!");
+    toast.success("Link copiado com senha embutida!");
   };
 
   if (!isAuthenticated) {
@@ -129,7 +130,7 @@ export default function AdminPage() {
                 <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}`)} title="Entrar na sala">
                   <MessageCircle className="h-4 w-4 text-primary" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => copyLink(room)} title="Copiar link">
+                <Button variant="ghost" size="icon" onClick={() => copyLink(room, pwd)} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Remover">
