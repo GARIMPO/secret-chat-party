@@ -4,8 +4,17 @@ import { getAblyClient } from "@/lib/ably";
 import { encryptMessage, decryptMessage } from "@/lib/crypto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft } from "lucide-react";
+import { Send, Lock, ArrowLeft, Smile, Trash2, Save } from "lucide-react";
+import { toast } from "sonner";
 import type Ably from "ably";
+
+const ACCESS_PASSWORD = "entrar2000";
+
+const EMOJI_LIST = [
+  "😀","😂","😍","🥰","😎","🤔","😢","😡","👍","👎",
+  "❤️","🔥","🎉","✅","❌","💬","🙏","👋","🤝","💯",
+  "😊","🥳","😜","🤣","😇","🫡","🫶","💀","👀","🫠",
+];
 
 interface ChatMessage {
   id: string;
@@ -14,24 +23,67 @@ interface ChatMessage {
   timestamp: number;
 }
 
+function getStorageKey(room: string) {
+  return `chat-messages-${room}`;
+}
+
+function loadMessages(room: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(getStorageKey(room));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMessages(room: string, messages: ChatMessage[]) {
+  localStorage.setItem(getStorageKey(room), JSON.stringify(messages));
+}
+
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const room = searchParams.get("room");
   const keyFromUrl = searchParams.get("key");
-  const autoPassword = keyFromUrl ? (() => { try { return atob(decodeURIComponent(keyFromUrl)); } catch { return ""; } })() : "";
+  const encryptionKey = keyFromUrl
+    ? (() => { try { return atob(decodeURIComponent(keyFromUrl)); } catch { return ""; } })()
+    : "";
 
   const [nickname, setNickname] = useState("");
-  const [roomPassword, setRoomPassword] = useState(autoPassword);
+  const [accessPassword, setAccessPassword] = useState("");
   const [joined, setJoined] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [autoSave, setAutoSave] = useState(() => {
+    if (!room) return false;
+    return localStorage.getItem(`chat-autosave-${room}`) === "true";
+  });
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const emojiRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Save messages when autoSave is on
+  useEffect(() => {
+    if (autoSave && room && joined) {
+      saveMessages(room, messages);
+    }
+  }, [messages, autoSave, room, joined]);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmoji(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   if (!room) {
     return (
@@ -39,7 +91,6 @@ export default function ChatPage() {
         <div className="text-center space-y-4">
           <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
           <p className="text-foreground font-medium">Nenhuma sala especificada.</p>
-          <p className="text-sm text-muted-foreground">Acesse via link com ?room=nome</p>
           <Button variant="outline" onClick={() => navigate("/")}>Voltar</Button>
         </div>
       </div>
@@ -48,11 +99,23 @@ export default function ChatPage() {
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nickname.trim()) return;
+    if (!nickname.trim()) {
+      toast.error("Digite seu apelido");
+      return;
+    }
+    if (accessPassword !== ACCESS_PASSWORD) {
+      toast.error("Senha de acesso incorreta");
+      return;
+    }
 
     const client = getAblyClient(nickname.trim());
     const channel = client.channels.get(`chat-${room}`);
     channelRef.current = channel;
+
+    // Load saved messages if autoSave was on
+    if (autoSave) {
+      setMessages(loadMessages(room));
+    }
 
     channel.subscribe("message", (msg: Ably.Message) => {
       const data = msg.data as ChatMessage;
@@ -66,8 +129,8 @@ export default function ChatPage() {
     e.preventDefault();
     if (!input.trim() || !channelRef.current) return;
 
-    const encrypted = roomPassword
-      ? encryptMessage(input.trim(), roomPassword)
+    const encrypted = encryptionKey
+      ? encryptMessage(input.trim(), encryptionKey)
       : input.trim();
 
     const msg: ChatMessage = {
@@ -79,15 +142,42 @@ export default function ChatPage() {
 
     channelRef.current.publish("message", msg);
     setInput("");
+    setShowEmoji(false);
+  };
+
+  const handleClearHistory = () => {
+    setMessages([]);
+    if (room) {
+      localStorage.removeItem(getStorageKey(room));
+    }
+    toast.success("Histórico apagado");
+  };
+
+  const toggleAutoSave = () => {
+    const next = !autoSave;
+    setAutoSave(next);
+    if (room) {
+      localStorage.setItem(`chat-autosave-${room}`, String(next));
+      if (next) {
+        saveMessages(room, messages);
+        toast.success("Salvamento automático ativado");
+      } else {
+        toast.info("Salvamento automático desativado");
+      }
+    }
+  };
+
+  const addEmoji = (emoji: string) => {
+    setInput((prev) => prev + emoji);
   };
 
   const renderMessage = (msg: ChatMessage) => {
     const isSelf = msg.sender === nickname;
-    const decrypted = roomPassword
-      ? decryptMessage(msg.encrypted, roomPassword)
+    const decrypted = encryptionKey
+      ? decryptMessage(msg.encrypted, encryptionKey)
       : msg.encrypted;
 
-    const isEncrypted = decrypted === msg.encrypted && roomPassword !== "";
+    const isEncrypted = decrypted === msg.encrypted && encryptionKey !== "";
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     return (
@@ -130,7 +220,7 @@ export default function ChatPage() {
               <Lock className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-xl font-semibold text-foreground">Sala: {room}</h1>
-            <p className="text-sm text-muted-foreground">{autoPassword ? "Senha detectada no link. Insira seu apelido." : "Insira seu apelido e a senha da sala"}</p>
+            <p className="text-sm text-muted-foreground">Insira seu apelido e a senha de acesso</p>
           </div>
           <div className="space-y-3">
             <Input
@@ -140,14 +230,12 @@ export default function ChatPage() {
               autoFocus
               maxLength={20}
             />
-            {!autoPassword && (
-              <Input
-                type="password"
-                placeholder="Senha da sala (para descriptografar)"
-                value={roomPassword}
-                onChange={(e) => setRoomPassword(e.target.value)}
-              />
-            )}
+            <Input
+              type="password"
+              placeholder="Senha de acesso"
+              value={accessPassword}
+              onChange={(e) => setAccessPassword(e.target.value)}
+            />
           </div>
           <Button type="submit" className="w-full active:scale-[0.97]">
             Entrar na sala
@@ -163,11 +251,25 @@ export default function ChatPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-sm font-semibold text-foreground">{room}</h1>
           <p className="text-xs text-muted-foreground">
-            {roomPassword ? "🔒 Criptografado" : "⚠️ Sem senha"}
+            {encryptionKey ? "🔒 Criptografado" : "⚠️ Sem criptografia"}
           </p>
+        </div>
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleAutoSave}
+            title={autoSave ? "Salvamento ativo" : "Ativar salvamento"}
+            className={autoSave ? "text-primary" : "text-muted-foreground"}
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleClearHistory} title="Apagar histórico">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       </header>
 
@@ -182,7 +284,32 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-3">
-        <div className="flex gap-2">
+        <div className="relative flex gap-2 items-center">
+          <div className="relative" ref={emojiRef}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowEmoji((v) => !v)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+            {showEmoji && (
+              <div className="absolute bottom-12 left-0 z-50 grid grid-cols-6 gap-1 rounded-xl bg-surface border border-border p-3 shadow-lg w-[220px]">
+                {EMOJI_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => addEmoji(emoji)}
+                    className="text-xl hover:bg-muted rounded-lg p-1 transition-colors active:scale-[0.9]"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <Input
             placeholder="Digite sua mensagem..."
             value={input}
