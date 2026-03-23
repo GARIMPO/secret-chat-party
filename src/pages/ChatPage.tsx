@@ -4,11 +4,8 @@ import { getAblyClient } from "@/lib/ably";
 import { encryptMessage, decryptMessage } from "@/lib/crypto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Send, Lock, ArrowLeft, Smile, Trash2, Save } from "lucide-react";
 import { toast } from "sonner";
-import GifPicker from "@/components/chat/GifPicker";
-import ConfettiButton, { fireConfetti } from "@/components/chat/ConfettiButton";
 import type Ably from "ably";
 
 const ACCESS_PASSWORD = "entrar2000";
@@ -24,8 +21,6 @@ interface ChatMessage {
   sender: string;
   encrypted: string;
   timestamp: number;
-  type?: "text" | "gif" | "confetti";
-  gifUrl?: string;
 }
 
 function getStorageKey(room: string) {
@@ -67,18 +62,19 @@ export default function ChatPage() {
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Save messages when autoSave is on
   useEffect(() => {
     if (autoSave && room && joined) {
       saveMessages(room, messages);
     }
   }, [messages, autoSave, room, joined]);
 
+  // Close emoji picker on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
@@ -116,25 +112,17 @@ export default function ChatPage() {
     const channel = client.channels.get(`chat-${room}`);
     channelRef.current = channel;
 
+    // Load saved messages if autoSave was on
     if (autoSave) {
       setMessages(loadMessages(room));
     }
 
     channel.subscribe("message", (msg: Ably.Message) => {
       const data = msg.data as ChatMessage;
-      // Fire confetti when receiving a confetti message
-      if (data.type === "confetti") {
-        fireConfetti();
-      }
       setMessages((prev) => [...prev, data]);
     });
 
     setJoined(true);
-  };
-
-  const publishMessage = (msg: ChatMessage) => {
-    if (!channelRef.current) return;
-    channelRef.current.publish("message", msg);
   };
 
   const handleSend = (e: React.FormEvent) => {
@@ -145,41 +133,23 @@ export default function ChatPage() {
       ? encryptMessage(input.trim(), encryptionKey)
       : input.trim();
 
-    publishMessage({
+    const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: nickname,
       encrypted,
       timestamp: Date.now(),
-      type: "text",
-    });
+    };
+
+    channelRef.current.publish("message", msg);
     setInput("");
     setShowEmoji(false);
   };
 
-  const handleSendGif = (gifUrl: string) => {
-    publishMessage({
-      id: crypto.randomUUID(),
-      sender: nickname,
-      encrypted: "",
-      timestamp: Date.now(),
-      type: "gif",
-      gifUrl,
-    });
-  };
-
-  const handleSendConfetti = () => {
-    publishMessage({
-      id: crypto.randomUUID(),
-      sender: nickname,
-      encrypted: "🎉 Confetes!",
-      timestamp: Date.now(),
-      type: "confetti",
-    });
-  };
-
   const handleClearHistory = () => {
     setMessages([]);
-    if (room) localStorage.removeItem(getStorageKey(room));
+    if (room) {
+      localStorage.removeItem(getStorageKey(room));
+    }
     toast.success("Histórico apagado");
   };
 
@@ -199,63 +169,16 @@ export default function ChatPage() {
 
   const addEmoji = (emoji: string) => {
     setInput((prev) => prev + emoji);
-    textareaRef.current?.focus();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(e as any);
-    }
   };
 
   const renderMessage = (msg: ChatMessage) => {
     const isSelf = msg.sender === nickname;
-    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    // GIF message
-    if (msg.type === "gif" && msg.gifUrl) {
-      return (
-        <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[75%] rounded-2xl px-3 py-2 shadow-sm ${
-            isSelf ? "bg-chat-self text-chat-self-foreground rounded-br-md" : "bg-chat-other text-chat-other-foreground rounded-bl-md"
-          }`}>
-            {!isSelf && (
-              <p className="text-sm font-black mb-1 text-primary" style={{ fontFamily: "'Arial Black', 'Arial Bold', sans-serif" }}>
-                {msg.sender}
-              </p>
-            )}
-            <img src={msg.gifUrl} alt="GIF" className="rounded-lg max-w-full" loading="lazy" />
-            <p className={`text-[10px] mt-1 ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>{time}</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Confetti message
-    if (msg.type === "confetti") {
-      return (
-        <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm ${
-            isSelf ? "bg-chat-self text-chat-self-foreground rounded-br-md" : "bg-chat-other text-chat-other-foreground rounded-bl-md"
-          }`}>
-            {!isSelf && (
-              <p className="text-sm font-black mb-1 text-primary" style={{ fontFamily: "'Arial Black', 'Arial Bold', sans-serif" }}>
-                {msg.sender}
-              </p>
-            )}
-            <p className="text-2xl text-center">🎉🎊🥳</p>
-            <p className={`text-[10px] mt-1 ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>{time}</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Text message
     const decrypted = encryptionKey
       ? decryptMessage(msg.encrypted, encryptionKey)
       : msg.encrypted;
+
     const isEncrypted = decrypted === msg.encrypted && encryptionKey !== "";
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"}`}>
@@ -269,10 +192,7 @@ export default function ChatPage() {
           }`}
         >
           {!isSelf && (
-            <p
-              className={`text-sm font-black mb-1 ${isEncrypted ? "text-chat-encrypted-foreground/70" : "text-primary"}`}
-              style={{ fontFamily: "'Arial Black', 'Arial Bold', sans-serif" }}
-            >
+            <p className={`text-xs font-medium mb-0.5 ${isEncrypted ? "text-chat-encrypted-foreground/70" : "text-primary"}`}>
               {msg.sender}
             </p>
           )}
@@ -364,47 +284,40 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-3">
-        <div className="relative flex gap-2 items-end">
-          <div className="flex flex-col gap-1">
-            <div className="relative" ref={emojiRef}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowEmoji((v) => !v)}
-                className="text-muted-foreground hover:text-foreground h-8 w-8"
-              >
-                <Smile className="h-5 w-5" />
-              </Button>
-              {showEmoji && (
-                <div className="absolute bottom-10 left-0 z-50 grid grid-cols-6 gap-1 rounded-xl bg-surface border border-border p-3 shadow-lg w-[220px]">
-                  {EMOJI_LIST.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => addEmoji(emoji)}
-                      className="text-xl hover:bg-muted rounded-lg p-1 transition-colors active:scale-[0.9]"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <GifPicker onSelect={handleSendGif} />
-            <ConfettiButton onSendConfetti={handleSendConfetti} />
+        <div className="relative flex gap-2 items-center">
+          <div className="relative" ref={emojiRef}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowEmoji((v) => !v)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+            {showEmoji && (
+              <div className="absolute bottom-12 left-0 z-50 grid grid-cols-6 gap-1 rounded-xl bg-surface border border-border p-3 shadow-lg w-[220px]">
+                {EMOJI_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => addEmoji(emoji)}
+                    className="text-xl hover:bg-muted rounded-lg p-1 transition-colors active:scale-[0.9]"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <Textarea
-            ref={textareaRef}
+          <Input
             placeholder="Digite sua mensagem..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
             autoFocus
-            className="flex-1 min-h-[60px] max-h-[120px] resize-none"
-            rows={2}
+            className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95] h-10 w-10 shrink-0">
+          <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95]">
             <Send className="h-4 w-4" />
           </Button>
         </div>
