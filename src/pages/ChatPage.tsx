@@ -140,12 +140,14 @@ export default function ChatPage() {
               autoFocus
               maxLength={20}
             />
-            <Input
-              type="password"
-              placeholder="Senha da sala (para descriptografar)"
-              value={roomPassword}
-              onChange={(e) => setRoomPassword(e.target.value)}
-            />
+            {!autoPassword && (
+              <Input
+                type="password"
+                placeholder="Senha da sala (para descriptografar)"
+                value={roomPassword}
+                onChange={(e) => setRoomPassword(e.target.value)}
+              />
+            )}
           </div>
           <Button type="submit" className="w-full active:scale-[0.97]">
             Entrar na sala

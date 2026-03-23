@@ -130,7 +130,7 @@ export default function AdminPage() {
                 <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}`)} title="Entrar na sala">
                   <MessageCircle className="h-4 w-4 text-primary" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => copyLink(room)} title="Copiar link">
+                <Button variant="ghost" size="icon" onClick={() => copyLink(room, pwd)} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Remover">
