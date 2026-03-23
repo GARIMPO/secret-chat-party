@@ -18,9 +18,11 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const room = searchParams.get("room");
+  const keyFromUrl = searchParams.get("key");
+  const autoPassword = keyFromUrl ? (() => { try { return atob(decodeURIComponent(keyFromUrl)); } catch { return ""; } })() : "";
 
   const [nickname, setNickname] = useState("");
-  const [roomPassword, setRoomPassword] = useState("");
+  const [roomPassword, setRoomPassword] = useState(autoPassword);
   const [joined, setJoined] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
