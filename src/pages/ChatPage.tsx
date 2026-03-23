@@ -130,7 +130,7 @@ export default function ChatPage() {
               <Lock className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-xl font-semibold text-foreground">Sala: {room}</h1>
-            <p className="text-sm text-muted-foreground">Insira seu apelido e a senha da sala</p>
+            <p className="text-sm text-muted-foreground">{autoPassword ? "Senha detectada no link. Insira seu apelido." : "Insira seu apelido e a senha da sala"}</p>
           </div>
           <div className="space-y-3">
             <Input
