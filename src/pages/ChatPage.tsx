@@ -12,9 +12,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Paperclip, Type, Italic } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Paperclip, Type, Italic, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
+import GifPicker from "@/components/chat/GifPicker";
+import EmotionBar from "@/components/chat/EmotionBar";
+import EmotionOverlay from "@/components/chat/EmotionOverlay";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 
 interface ChatMessage {
   id: string;
@@ -24,6 +31,12 @@ interface ChatMessage {
   fontSize?: string;
   isItalic?: boolean;
   attachment?: { name: string; url: string; type: string };
+  gif?: string;
+}
+
+interface EmotionEvent {
+  emoji: string;
+  id: string;
 }
 
 const FONT_SIZES: Record<string, string> = {
@@ -70,6 +83,9 @@ export default function ChatPage() {
   const [fontSize, setFontSize] = useState("normal");
   const [isItalic, setIsItalic] = useState(false);
   const [chatFontSize, setChatFontSize] = useState("normal");
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -128,6 +144,11 @@ export default function ChatPage() {
       updateMessages(() => []);
     });
 
+    channel.subscribe("emotion", (msg: Ably.Message) => {
+      const data = msg.data as EmotionEvent;
+      setEmotion({ ...data });
+    });
+
     setJoined(true);
   };
 
@@ -148,6 +169,23 @@ export default function ChatPage() {
 
     channelRef.current.publish("message", msg);
     setInput("");
+  };
+
+  const handleSendGif = (gifUrl: string) => {
+    if (!channelRef.current) return;
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("GIF", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      gif: gifUrl,
+    };
+    channelRef.current.publish("message", msg);
+  };
+
+  const handleSendEmotion = (emoji: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID() });
   };
 
   const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,8 +230,7 @@ export default function ChatPage() {
     const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
     const isEncrypted = decrypted === msg.encrypted;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const msgFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-sm";
-    const senderFontSize = msg.fontSize ? FONT_SIZES[msg.fontSize] : "text-sm";
+    const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-sm";
 
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
@@ -211,16 +248,32 @@ export default function ChatPage() {
               {msg.sender}
             </p>
           )}
-          <p
-            className={`${msgFontSize} ${senderFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""} ${msg.isItalic ? "italic" : ""}`}
-          >
-            {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-            {decrypted}
-          </p>
+
+          {msg.gif ? (
+            <img
+              src={msg.gif}
+              alt="GIF"
+              className="max-w-full rounded-lg max-h-48 cursor-pointer"
+              onClick={() => setLightboxUrl(msg.gif!)}
+            />
+          ) : (
+            <p
+              className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""} ${msg.isItalic ? "italic" : ""}`}
+            >
+              {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
+              {decrypted}
+            </p>
+          )}
+
           {msg.attachment && (
             <div className="mt-2">
               {msg.attachment.type.startsWith("image/") ? (
-                <img src={msg.attachment.url} alt={msg.attachment.name} className="max-w-full rounded-lg max-h-48 object-cover" />
+                <img
+                  src={msg.attachment.url}
+                  alt={msg.attachment.name}
+                  className="max-w-full rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setLightboxUrl(msg.attachment!.url)}
+                />
               ) : (
                 <a href={msg.attachment.url} download={msg.attachment.name} className="text-xs underline text-primary">
                   📎 {msg.attachment.name}
@@ -286,6 +339,17 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      <EmotionOverlay emotion={emotion} />
+
+      {/* Lightbox for images */}
+      <Dialog open={!!lightboxUrl} onOpenChange={() => setLightboxUrl(null)}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 bg-background/95">
+          {lightboxUrl && (
+            <img src={lightboxUrl} alt="Preview" className="w-full h-full object-contain max-h-[85vh] rounded" />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4" />
@@ -324,7 +388,7 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-3">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <Select value={fontSize} onValueChange={setFontSize}>
             <SelectTrigger className="w-24 h-8 text-xs">
               <Type className="h-3 w-3 mr-1" />
@@ -347,8 +411,10 @@ export default function ChatPage() {
           >
             <Italic className="h-3.5 w-3.5" />
           </Button>
+          <div className="border-l border-border h-6 mx-1" />
+          <EmotionBar onSend={handleSendEmotion} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <input
             type="file"
             ref={fileInputRef}
@@ -356,16 +422,34 @@ export default function ChatPage() {
             onChange={handleFileAttach}
             accept="image/*,.pdf,.doc,.docx,.txt"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            title="Anexar arquivo"
-            className="shrink-0"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col gap-1 shrink-0 self-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              title="Anexar arquivo"
+              className="h-8 w-8"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowGifPicker(!showGifPicker)}
+              title="Enviar GIF"
+              className="h-8 w-8"
+            >
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+          </div>
+          {showGifPicker && (
+            <GifPicker
+              onSelect={handleSendGif}
+              onClose={() => setShowGifPicker(false)}
+            />
+          )}
           <Textarea
             placeholder="Digite sua mensagem..."
             value={input}
