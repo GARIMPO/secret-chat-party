@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 const ADMIN_LOGIN = "Jafuis";
 const ADMIN_PASSWORD = "Markinhos";
+const DEFAULT_ROOM_PASSWORD = "entrar2025";
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -15,7 +16,6 @@ export default function AdminPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [newRoom, setNewRoom] = useState("");
-  const [newRoomPassword, setNewRoomPassword] = useState("");
   const [rooms, setRooms] = useState<Record<string, string>>({});
 
   const handleLogin = (e: React.FormEvent) => {
@@ -30,21 +30,25 @@ export default function AdminPage() {
 
   const handleAddRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRoom.trim() || !newRoomPassword.trim()) {
-      toast.error("Preencha o nome da sala e a senha");
+    if (!newRoom.trim()) {
+      toast.error("Preencha o nome da sala");
       return;
     }
-    setRoomPassword(newRoom.trim(), newRoomPassword.trim());
+    setRoomPassword(newRoom.trim(), DEFAULT_ROOM_PASSWORD);
     setRooms(getAllRoomPasswords());
     toast.success(`Sala "${newRoom}" criada!`);
     setNewRoom("");
-    setNewRoomPassword("");
   };
 
   const handleDelete = (room: string) => {
     deleteRoomPassword(room);
     setRooms(getAllRoomPasswords());
     toast.success(`Sala "${room}" removida`);
+  };
+
+  const handleClearChat = (room: string) => {
+    localStorage.removeItem(`chat-messages-${room}`);
+    toast.success(`Histórico da sala "${room}" apagado!`);
   };
 
   const copyLink = (room: string) => {
@@ -107,32 +111,34 @@ export default function AdminPage() {
         <form onSubmit={handleAddRoom} className="flex flex-col gap-3 rounded-xl bg-surface p-5 shadow-sm border border-border">
           <h2 className="text-sm font-medium text-muted-foreground">Criar nova sala</h2>
           <div className="flex gap-2">
-            <Input placeholder="Nome da sala" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} />
-            <Input type="password" placeholder="Senha" value={newRoomPassword} onChange={(e) => setNewRoomPassword(e.target.value)} />
+            <Input placeholder="Nome da sala" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className="flex-1" />
+            <Button type="submit" size="sm" className="active:scale-[0.97]">
+              <Plus className="h-4 w-4 mr-1" /> Criar
+            </Button>
           </div>
-          <Button type="submit" size="sm" className="self-end active:scale-[0.97]">
-            <Plus className="h-4 w-4 mr-1" /> Criar
-          </Button>
+          <p className="text-xs text-muted-foreground">Senha padrão: <span className="font-mono font-medium text-foreground">{DEFAULT_ROOM_PASSWORD}</span></p>
         </form>
 
         <div className="space-y-2">
           {roomEntries.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">Nenhuma sala criada ainda.</p>
           )}
-          {roomEntries.map(([room, pwd]) => (
+          {roomEntries.map(([room]) => (
             <div key={room} className="flex items-center justify-between rounded-xl bg-surface p-4 shadow-sm border border-border">
               <div>
                 <p className="font-medium text-foreground">{room}</p>
-                <p className="text-xs text-muted-foreground font-mono">Senha: {pwd}</p>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}`)} title="Entrar na sala">
+                <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}&admin=true`)} title="Entrar na sala">
                   <MessageCircle className="h-4 w-4 text-primary" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => copyLink(room)} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Remover">
+                <Button variant="ghost" size="icon" onClick={() => handleClearChat(room)} title="Apagar histórico">
+                  <Trash2 className="h-4 w-4 text-orange-500" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Remover sala">
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
