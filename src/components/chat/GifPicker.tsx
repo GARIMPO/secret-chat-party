@@ -25,8 +25,8 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
     setLoading(true);
     try {
       const endpoint = q === "trending"
-        ? `https://tenor.googleapis.com/v2/featured?key=${TENOR_API_KEY}&limit=20&media_filter=tinygif,gif`
-        : `https://tenor.googleapis.com/v2/search?key=${TENOR_API_KEY}&q=${encodeURIComponent(q)}&limit=20&media_filter=tinygif,gif`;
+        ? `https://tenor.googleapis.com/v2/featured?key=${TENOR_API_KEY}&limit=20&media_filter=tinygif,gif&contentfilter=off`
+        : `https://tenor.googleapis.com/v2/search?key=${TENOR_API_KEY}&q=${encodeURIComponent(q)}&limit=20&media_filter=tinygif,gif&contentfilter=off`;
       
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -44,7 +44,7 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   };
 
   return (
-    <div className="absolute bottom-full mb-2 left-0 w-80 max-h-96 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
+    <div className="absolute bottom-full mb-2 left-0 w-72 sm:w-80 max-h-96 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
       <div className="p-2 border-b border-border flex items-center gap-2">
         <Input
           placeholder="Buscar GIF..."

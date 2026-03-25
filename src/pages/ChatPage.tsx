@@ -12,12 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Paperclip, Type, Italic, Image as ImageIcon } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, ChevronUp, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
 import EmotionBar from "@/components/chat/EmotionBar";
 import EmotionOverlay from "@/components/chat/EmotionOverlay";
+import ColorPicker from "@/components/chat/ColorPicker";
+import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import {
   Dialog,
   DialogContent,
@@ -28,23 +30,16 @@ interface ChatMessage {
   sender: string;
   encrypted: string;
   timestamp: number;
-  fontSize?: string;
-  isItalic?: boolean;
+  textColor?: string;
   attachment?: { name: string; url: string; type: string };
   gif?: string;
+  drawing?: string;
 }
 
 interface EmotionEvent {
   emoji: string;
   id: string;
 }
-
-const FONT_SIZES: Record<string, string> = {
-  small: "text-xs",
-  normal: "text-sm",
-  large: "text-base",
-  xlarge: "text-lg",
-};
 
 const CHAT_FONT_SIZES: Record<string, string> = {
   small: "text-xs",
@@ -55,6 +50,7 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 };
 
 const ROOM_PASSWORD = "entrar2025";
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
 function loadMessages(room: string): ChatMessage[] {
   try {
@@ -69,6 +65,36 @@ function saveMessages(room: string, messages: ChatMessage[]) {
   localStorage.setItem(`chat-messages-${room}`, JSON.stringify(messages));
 }
 
+function getSession(room: string) {
+  try {
+    const s = localStorage.getItem(`chat-session-${room}`);
+    if (!s) return null;
+    const parsed = JSON.parse(s);
+    if (Date.now() - parsed.lastActive > INACTIVITY_TIMEOUT) {
+      localStorage.removeItem(`chat-session-${room}`);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(room: string, nickname: string) {
+  localStorage.setItem(`chat-session-${room}`, JSON.stringify({ nickname, lastActive: Date.now() }));
+}
+
+function updateSessionActivity(room: string) {
+  try {
+    const s = localStorage.getItem(`chat-session-${room}`);
+    if (s) {
+      const parsed = JSON.parse(s);
+      parsed.lastActive = Date.now();
+      localStorage.setItem(`chat-session-${room}`, JSON.stringify(parsed));
+    }
+  } catch {}
+}
+
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -80,19 +106,58 @@ export default function ChatPage() {
   const [joined, setJoined] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [fontSize, setFontSize] = useState("normal");
-  const [isItalic, setIsItalic] = useState(false);
+  const [textColor, setTextColor] = useState("");
   const [chatFontSize, setChatFontSize] = useState("normal");
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const activityInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    if (!room) return;
+    const session = getSession(room);
+    if (session) {
+      setNickname(session.nickname);
+      setRoomPassword(ROOM_PASSWORD);
+    }
+  }, [room]);
+
+  // Activity tracker
+  useEffect(() => {
+    if (!joined || !room) return;
+
+    const trackActivity = () => updateSessionActivity(room);
+
+    // Update on user interactions
+    const events = ["mousemove", "keydown", "touchstart", "scroll"];
+    events.forEach((e) => window.addEventListener(e, trackActivity, { passive: true }));
+
+    // Periodic check for inactivity
+    activityInterval.current = setInterval(() => {
+      const session = getSession(room);
+      if (!session) {
+        setJoined(false);
+        setRoomPassword("");
+        channelRef.current?.detach();
+        channelRef.current = null;
+        toast.info("Sessão expirada por inatividade");
+      }
+    }, 30000);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, trackActivity));
+      if (activityInterval.current) clearInterval(activityInterval.current);
+    };
+  }, [joined, room]);
 
   const updateMessages = useCallback((updater: (prev: ChatMessage[]) => ChatMessage[]) => {
     setMessages((prev) => {
@@ -125,6 +190,7 @@ export default function ChatPage() {
 
     const stored = loadMessages(room);
     setMessages(stored);
+    saveSession(room, nickname.trim());
 
     const client = getAblyClient(nickname.trim());
     const channel = client.channels.get(`chat-${room}`);
@@ -149,6 +215,11 @@ export default function ChatPage() {
       setEmotion({ ...data });
     });
 
+    channel.subscribe("drawing", (msg: Ably.Message) => {
+      const data = msg.data as ChatMessage;
+      updateMessages((prev) => [...prev, data]);
+    });
+
     setJoined(true);
   };
 
@@ -163,12 +234,12 @@ export default function ChatPage() {
       sender: nickname,
       encrypted,
       timestamp: Date.now(),
-      fontSize,
-      isItalic,
+      textColor: textColor || undefined,
     };
 
     channelRef.current.publish("message", msg);
     setInput("");
+    updateSessionActivity(room);
   };
 
   const handleSendGif = (gifUrl: string) => {
@@ -188,31 +259,16 @@ export default function ChatPage() {
     channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID() });
   };
 
-  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !channelRef.current) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Arquivo muito grande (máx 5MB)");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = reader.result as string;
-      const msg: ChatMessage = {
-        id: crypto.randomUUID(),
-        sender: nickname,
-        encrypted: encryptMessage(`📎 ${file.name}`, ROOM_PASSWORD),
-        timestamp: Date.now(),
-        fontSize,
-        isItalic,
-        attachment: { name: file.name, url, type: file.type },
-      };
-      channelRef.current?.publish("message", msg);
+  const handleSendDrawing = (dataUrl: string) => {
+    if (!channelRef.current) return;
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("🎨 Desenho", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      drawing: dataUrl,
     };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    channelRef.current.publish("message", msg);
   };
 
   const handleDeleteMessage = (messageId: string) => {
@@ -235,7 +291,7 @@ export default function ChatPage() {
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
         <div
-          className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm relative ${
+          className={`max-w-[80%] sm:max-w-[75%] rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
             isSelf
               ? "bg-chat-self text-chat-self-foreground rounded-br-md"
               : isEncrypted
@@ -249,7 +305,14 @@ export default function ChatPage() {
             </p>
           )}
 
-          {msg.gif ? (
+          {msg.drawing ? (
+            <img
+              src={msg.drawing}
+              alt="Desenho"
+              className="max-w-full rounded-lg max-h-48 cursor-pointer"
+              onClick={() => setLightboxUrl(msg.drawing!)}
+            />
+          ) : msg.gif ? (
             <img
               src={msg.gif}
               alt="GIF"
@@ -258,29 +321,14 @@ export default function ChatPage() {
             />
           ) : (
             <p
-              className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""} ${msg.isItalic ? "italic" : ""}`}
+              className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""}`}
+              style={msg.textColor ? { color: msg.textColor } : undefined}
             >
               {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
               {decrypted}
             </p>
           )}
 
-          {msg.attachment && (
-            <div className="mt-2">
-              {msg.attachment.type.startsWith("image/") ? (
-                <img
-                  src={msg.attachment.url}
-                  alt={msg.attachment.name}
-                  className="max-w-full rounded-lg max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setLightboxUrl(msg.attachment!.url)}
-                />
-              ) : (
-                <a href={msg.attachment.url} download={msg.attachment.name} className="text-xs underline text-primary">
-                  📎 {msg.attachment.name}
-                </a>
-              )}
-            </div>
-          )}
           <div className="flex items-center justify-between mt-1">
             <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
               {time}
@@ -305,7 +353,7 @@ export default function ChatPage() {
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <form
           onSubmit={handleJoin}
-          className="w-full max-w-sm space-y-6 rounded-2xl bg-surface p-8 shadow-lg shadow-primary/5 border border-border"
+          className="w-full max-w-sm space-y-6 rounded-2xl bg-surface p-6 sm:p-8 shadow-lg shadow-primary/5 border border-border"
         >
           <div className="flex flex-col items-center gap-2">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -338,10 +386,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col bg-background">
       <EmotionOverlay emotion={emotion} />
 
-      {/* Lightbox for images */}
+      {showDrawing && (
+        <DrawingCanvas onSend={handleSendDrawing} onClose={() => setShowDrawing(false)} />
+      )}
+
       <Dialog open={!!lightboxUrl} onOpenChange={() => setLightboxUrl(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 bg-background/95">
           {lightboxUrl && (
@@ -350,17 +401,17 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+      <header className="flex items-center gap-2 sm:gap-3 border-b border-border bg-surface px-3 sm:px-4 py-2 sm:py-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="h-8 w-8 shrink-0">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-sm font-semibold text-foreground">{room}</h1>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-semibold text-foreground truncate">{room}</h1>
           <p className="text-xs text-muted-foreground">🔒 Criptografado</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Select value={chatFontSize} onValueChange={setChatFontSize}>
-            <SelectTrigger className="w-24 h-8 text-xs">
+            <SelectTrigger className="w-20 sm:w-24 h-8 text-xs">
               <SelectValue placeholder="Fonte" />
             </SelectTrigger>
             <SelectContent>
@@ -371,13 +422,13 @@ export default function ChatPage() {
               <SelectItem value="xxlarge">Enorme</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" onClick={handleClearAll} title="Apagar histórico">
+          <Button variant="ghost" size="icon" onClick={handleClearAll} title="Apagar histórico" className="h-8 w-8">
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
         {messages.length === 0 && (
           <p className="text-center text-sm text-muted-foreground pt-12">
             Nenhuma mensagem ainda. Diga olá! 👋
@@ -387,51 +438,37 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-border bg-surface p-3">
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <Select value={fontSize} onValueChange={setFontSize}>
-            <SelectTrigger className="w-24 h-8 text-xs">
-              <Type className="h-3 w-3 mr-1" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="small">Pequena</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="large">Grande</SelectItem>
-              <SelectItem value="xlarge">Maior</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant={isItalic ? "default" : "outline"}
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setIsItalic(!isItalic)}
-            title="Itálico / Cursiva"
-          >
-            <Italic className="h-3.5 w-3.5" />
-          </Button>
-          <div className="border-l border-border h-6 mx-1" />
-          <EmotionBar onSend={handleSendEmotion} />
-        </div>
-        <div className="flex gap-2 relative">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleFileAttach}
-            accept="image/*,.pdf,.doc,.docx,.txt"
-          />
-          <div className="flex flex-col gap-1 shrink-0 self-end">
+      <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3">
+        {/* Collapsible toolbar */}
+        {showToolbar && (
+          <div className="flex items-center gap-2 mb-2 flex-wrap px-1 animate-in slide-in-from-bottom-2 duration-200">
+            <ColorPicker value={textColor} onChange={setTextColor} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowDrawing(true)}
+              title="Desenhar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <div className="border-l border-border h-6 mx-1" />
+            <EmotionBar onSend={handleSendEmotion} />
+          </div>
+        )}
+
+        <div className="flex gap-2 relative items-end">
+          <div className="flex flex-col gap-1 shrink-0">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              title="Anexar arquivo"
+              onClick={() => setShowToolbar(!showToolbar)}
+              title="Ferramentas"
               className="h-8 w-8"
             >
-              <Paperclip className="h-4 w-4" />
+              <ChevronUp className={`h-4 w-4 transition-transform ${showToolbar ? "rotate-180" : ""}`} />
             </Button>
             <Button
               type="button"
@@ -441,7 +478,7 @@ export default function ChatPage() {
               title="Enviar GIF"
               className="h-8 w-8"
             >
-              <ImageIcon className="h-4 w-4" />
+              <span className="text-[10px] font-bold leading-none">GIF</span>
             </Button>
           </div>
           {showGifPicker && (
@@ -460,10 +497,10 @@ export default function ChatPage() {
                 handleSend(e);
               }
             }}
-            className={`flex-1 min-h-[56px] max-h-[56px] resize-none ${isItalic ? "italic" : ""}`}
+            className="flex-1 min-h-[56px] max-h-[56px] resize-none text-sm"
             rows={2}
           />
-          <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95] shrink-0 self-end">
+          <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95] shrink-0">
             <Send className="h-4 w-4" />
           </Button>
         </div>
