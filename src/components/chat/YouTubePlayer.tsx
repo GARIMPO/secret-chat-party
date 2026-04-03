@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Music, X, Send, ChevronDown, ChevronUp } from "lucide-react";
+
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: (() => void) | undefined;
+  }
+}
 
 interface YouTubePlayerProps {
   videoId: string | null;
@@ -9,6 +16,8 @@ interface YouTubePlayerProps {
   onSubmitLink: (videoId: string) => void;
   onTogglePlay: () => void;
   onClose: () => void;
+  onSeek?: (time: number) => void;
+  seekTo?: number | null;
 }
 
 function extractVideoId(url: string): string | null {
@@ -23,9 +32,93 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogglePlay, onClose }: YouTubePlayerProps) {
+let ytApiLoaded = false;
+let ytApiReady = false;
+const ytApiCallbacks: (() => void)[] = [];
+
+function loadYTApi(cb: () => void) {
+  if (ytApiReady) { cb(); return; }
+  ytApiCallbacks.push(cb);
+  if (ytApiLoaded) return;
+  ytApiLoaded = true;
+  const tag = document.createElement("script");
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(tag);
+  window.onYouTubeIframeAPIReady = () => {
+    ytApiReady = true;
+    ytApiCallbacks.forEach((fn) => fn());
+    ytApiCallbacks.length = 0;
+  };
+}
+
+export default function YouTubePlayer({
+  videoId, isPlaying, onSubmitLink, onTogglePlay, onClose, onSeek, seekTo,
+}: YouTubePlayerProps) {
   const [linkInput, setLinkInput] = useState("");
   const [minimized, setMinimized] = useState(false);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastSeekRef = useRef<number>(0);
+  const ignoreSeekRef = useRef(false);
+
+  // Initialize YT player
+  useEffect(() => {
+    if (!videoId || minimized) return;
+    loadYTApi(() => {
+      if (!containerRef.current) return;
+      // Clear previous
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+        playerRef.current = null;
+      }
+      containerRef.current.innerHTML = "";
+      const div = document.createElement("div");
+      div.id = "yt-player-" + Date.now();
+      containerRef.current.appendChild(div);
+
+      playerRef.current = new window.YT.Player(div.id, {
+        videoId,
+        playerVars: { autoplay: 1, enablejsapi: 1, rel: 0, modestbranding: 1 },
+        events: {
+          onStateChange: (event: any) => {
+            // Detect user seeking by checking time jumps
+            if (event.data === window.YT.PlayerState.PLAYING || event.data === window.YT.PlayerState.PAUSED) {
+              const currentTime = playerRef.current?.getCurrentTime?.() || 0;
+              if (Math.abs(currentTime - lastSeekRef.current) > 3 && !ignoreSeekRef.current) {
+                onSeek?.(currentTime);
+              }
+              lastSeekRef.current = currentTime;
+            }
+          },
+        },
+      });
+
+      // Periodically track time for seek detection
+      const interval = setInterval(() => {
+        if (playerRef.current?.getCurrentTime) {
+          lastSeekRef.current = playerRef.current.getCurrentTime();
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    });
+
+    return () => {
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+        playerRef.current = null;
+      }
+    };
+  }, [videoId, minimized]);
+
+  // Handle incoming seek
+  useEffect(() => {
+    if (seekTo != null && playerRef.current?.seekTo) {
+      ignoreSeekRef.current = true;
+      playerRef.current.seekTo(seekTo, true);
+      lastSeekRef.current = seekTo;
+      setTimeout(() => { ignoreSeekRef.current = false; }, 2000);
+    }
+  }, [seekTo]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +152,6 @@ export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogg
 
   return (
     <div className="border-b border-border bg-black">
-      {/* Header bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface border-b border-border">
         <div className="flex items-center gap-2">
           <Music className="h-4 w-4 text-primary" />
@@ -74,18 +166,11 @@ export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogg
           </Button>
         </div>
       </div>
-      {/* Video - smaller on desktop, full on mobile */}
       {!minimized && (
         <div className="flex justify-center bg-black">
           <div className="w-full sm:max-w-[50%] lg:max-w-[40%]">
             <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1`}
-                className="absolute inset-0 w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                title="YouTube player"
-              />
+              <div ref={containerRef} className="absolute inset-0 w-full h-full" />
             </div>
           </div>
         </div>
