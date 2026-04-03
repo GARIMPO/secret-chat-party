@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -156,12 +156,59 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Auto-rejoin from saved session
   useEffect(() => {
-    if (!room) return;
+    if (!room || joined) return;
     const session = getSession(room);
     if (session) {
       setNickname(session.nickname);
       setRoomPassword(ROOM_PASSWORD);
+      // Auto-join with saved session
+      const stored = loadMessages(room);
+      setMessages(stored);
+      saveSession(room, session.nickname);
+      nicknameRef.current = session.nickname;
+
+      const client = getAblyClient(session.nickname);
+      const channel = client.channels.get(`chat-${room}`);
+      channelRef.current = channel;
+
+      channel.subscribe("message", (msg: Ably.Message) => {
+        const data = msg.data as ChatMessage;
+        updateMessages((prev) => [...prev, data]);
+        if (data.sender !== nicknameRef.current) playBeep();
+      });
+      channel.subscribe("delete-message", (msg: Ably.Message) => {
+        const { messageId } = msg.data as { messageId: string };
+        updateMessages((prev) => prev.filter((m) => m.id !== messageId));
+      });
+      channel.subscribe("clear-all", () => updateMessages(() => []));
+      channel.subscribe("emotion", (msg: Ably.Message) => setEmotion({ ...(msg.data as EmotionEvent) }));
+      channel.subscribe("drawing", (msg: Ably.Message) => {
+        const data = msg.data as ChatMessage;
+        updateMessages((prev) => [...prev, data]);
+        if (data.sender !== nicknameRef.current) playBeep();
+      });
+      channel.subscribe("youtube", (msg: Ably.Message) => setYtVideo(msg.data as YouTubeEvent));
+      channel.subscribe("user-join", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string };
+        updateMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }]);
+      });
+      channel.subscribe("user-leave", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string };
+        updateMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }]);
+      });
+
+      channel.publish("user-join", { nickname: session.nickname });
+      setJoined(true);
     }
   }, [room]);
 
@@ -347,6 +394,19 @@ export default function ChatPage() {
     if (!channelRef.current) return;
     channelRef.current.publish("clear-all", {});
     toast.success("Histórico apagado!");
+  };
+
+  const handleLeave = () => {
+    if (room) {
+      channelRef.current?.publish("user-leave", { nickname: nicknameRef.current });
+      localStorage.removeItem(`chat-session-${room}`);
+      channelRef.current?.detach();
+      channelRef.current = null;
+      setJoined(false);
+      setNickname("");
+      setRoomPassword("");
+      toast.info("Você saiu da sala");
+    }
   };
 
   const handleYouTubeSubmit = (videoId: string) => {
@@ -555,6 +615,24 @@ export default function ChatPage() {
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleClearAll}>Apagar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" title="Sair da sala" className="h-8 gap-1 text-xs text-destructive">
+                <DoorOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sair da sala?</AlertDialogTitle>
+                <AlertDialogDescription>Você será desconectado e precisará entrar novamente.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLeave}>Sair</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
