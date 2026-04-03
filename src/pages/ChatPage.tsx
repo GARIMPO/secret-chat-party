@@ -49,6 +49,7 @@ interface ChatMessage {
   drawing?: string;
   system?: boolean;
   mood?: string;
+  reactions?: Record<string, string[]>; // emoji -> array of nicknames
 }
 
 interface EmotionEvent {
