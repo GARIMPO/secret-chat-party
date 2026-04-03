@@ -147,7 +147,13 @@ export default function ChatPage() {
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [ytVideo, setYtVideo] = useState<YouTubeEvent>({ videoId: null, isPlaying: false });
+  const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
+    try {
+      const saved = localStorage.getItem(`yt-state-${room}`);
+      return saved ? JSON.parse(saved) : { videoId: null, isPlaying: false };
+    } catch { return { videoId: null, isPlaying: false }; }
+  });
+  const [ytSeekTo, setYtSeekTo] = useState<number | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activityInterval = useRef<ReturnType<typeof setInterval> | null>(null);
