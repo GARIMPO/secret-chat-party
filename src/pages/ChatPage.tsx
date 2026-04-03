@@ -676,6 +676,8 @@ export default function ChatPage() {
           onSubmitLink={handleYouTubeSubmit}
           onTogglePlay={handleYouTubeToggle}
           onClose={handleYouTubeClose}
+          onSeek={handleYouTubeSeek}
+          seekTo={ytSeekTo}
         />
       )}
 
