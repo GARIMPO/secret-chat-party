@@ -317,6 +317,11 @@ export default function ChatPage() {
     channel.subscribe("youtube", (msg: Ably.Message) => {
       const data = msg.data as YouTubeEvent;
       setYtVideo(data);
+      if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
+    });
+    channel.subscribe("youtube-seek", (msg: Ably.Message) => {
+      const { time } = msg.data as { time: number };
+      setYtSeekTo(time);
     });
 
     channel.subscribe("user-join", (msg: Ably.Message) => {
