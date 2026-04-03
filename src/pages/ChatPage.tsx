@@ -396,6 +396,19 @@ export default function ChatPage() {
     toast.success("Histórico apagado!");
   };
 
+  const handleLeave = () => {
+    if (room) {
+      channelRef.current?.publish("user-leave", { nickname: nicknameRef.current });
+      localStorage.removeItem(`chat-session-${room}`);
+      channelRef.current?.detach();
+      channelRef.current = null;
+      setJoined(false);
+      setNickname("");
+      setRoomPassword("");
+      toast.info("Você saiu da sala");
+    }
+  };
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
     setYtVideo(evt);
