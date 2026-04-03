@@ -735,6 +735,8 @@ export default function ChatPage() {
           </Button>
           <div className="border-l border-border h-6 mx-1" />
           <EmotionBar onSend={handleSendEmotion} />
+          <div className="border-l border-border h-6 mx-1" />
+          <MoodPicker currentMood={myMood} onSelect={handleMoodChange} />
         </div>
 
         <div className="flex gap-2 relative items-end">
