@@ -436,6 +436,11 @@ export default function ChatPage() {
     channelRef.current?.publish("delete-message", { messageId });
   };
 
+  const handleReaction = (messageId: string, emoji: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("reaction", { messageId, emoji, nickname });
+  };
+
   const handleClearAll = () => {
     if (!channelRef.current) return;
     channelRef.current.publish("clear-all", {});
