@@ -151,7 +151,7 @@ export default function YouTubePlayer({
   }
 
   return (
-    <div className="border-b border-border bg-black">
+    <div className="border-b border-border relative z-10 shrink-0">
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface border-b border-border">
         <div className="flex items-center gap-2">
           <Music className="h-4 w-4 text-primary" />
@@ -167,10 +167,10 @@ export default function YouTubePlayer({
         </div>
       </div>
       {!minimized && (
-        <div className="flex justify-center bg-black">
+        <div className="flex justify-center">
           <div className="w-full sm:max-w-[50%] lg:max-w-[40%]">
             <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+              <div ref={containerRef} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
             </div>
           </div>
         </div>
