@@ -22,6 +22,7 @@ import EmotionOverlay from "@/components/chat/EmotionOverlay";
 import ColorPicker from "@/components/chat/ColorPicker";
 import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
+import MoodPicker from "@/components/chat/MoodPicker";
 import {
   Dialog,
   DialogContent,
@@ -147,6 +148,8 @@ export default function ChatPage() {
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [myMood, setMyMood] = useState<string | null>(null);
+  const [userMoods, setUserMoods] = useState<Record<string, string>>({});
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
     if (room) {
       try {
@@ -223,6 +226,10 @@ export default function ChatPage() {
           encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
           timestamp: Date.now(), system: true,
         }]);
+      });
+      channel.subscribe("mood", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string; mood: string };
+        setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
       });
 
       channel.publish("user-join", { nickname: session.nickname });
@@ -351,6 +358,11 @@ export default function ChatPage() {
       updateMessages((prev) => [...prev, sysMsg]);
     });
 
+    channel.subscribe("mood", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; mood: string };
+      setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
+    });
+
     // Publish join event
     channel.publish("user-join", { nickname: nickname.trim() });
 
@@ -407,6 +419,12 @@ export default function ChatPage() {
       drawing: dataUrl,
     };
     channelRef.current.publish("message", msg);
+  };
+
+  const handleMoodChange = (emoji: string) => {
+    setMyMood(emoji);
+    setUserMoods((prev) => ({ ...prev, [nickname]: emoji }));
+    channelRef.current?.publish("mood", { nickname, mood: emoji });
   };
 
   const handleDeleteMessage = (messageId: string) => {
@@ -495,8 +513,19 @@ export default function ChatPage() {
           }`}
         >
           {!isSelf && (
-            <p className="text-sm font-bold mb-0.5 text-primary">
+            <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
               {msg.sender}
+              {userMoods[msg.sender] && (
+                <span className="text-lg animate-mood-bounce inline-block">{userMoods[msg.sender]}</span>
+              )}
+            </p>
+          )}
+          {isSelf && (
+            <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
+              {nickname}
+              {myMood && (
+                <span className="text-lg animate-mood-bounce inline-block">{myMood}</span>
+              )}
             </p>
           )}
 
@@ -706,6 +735,8 @@ export default function ChatPage() {
           </Button>
           <div className="border-l border-border h-6 mx-1" />
           <EmotionBar onSend={handleSendEmotion} />
+          <div className="border-l border-border h-6 mx-1" />
+          <MoodPicker currentMood={myMood} onSelect={handleMoodChange} />
         </div>
 
         <div className="flex gap-2 relative items-end">
