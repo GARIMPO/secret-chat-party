@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Camera, SmilePlus } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -26,6 +26,8 @@ import MoodPicker from "@/components/chat/MoodPicker";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -38,6 +40,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ChatMessage {
   id: string;
@@ -49,6 +56,7 @@ interface ChatMessage {
   drawing?: string;
   system?: boolean;
   mood?: string;
+  reactions?: Record<string, string[]>; // emoji -> array of nicknames
 }
 
 interface EmotionEvent {
@@ -74,6 +82,8 @@ const ROOM_PASSWORD = "entrar2025";
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉"];
 
 function linkify(text: string) {
   const parts = text.split(URL_REGEX);
@@ -131,6 +141,14 @@ function updateSessionActivity(room: string) {
   } catch {}
 }
 
+function getUserAvatar(room: string): string {
+  return localStorage.getItem(`chat-avatar-${room}`) || "";
+}
+
+function saveUserAvatar(room: string, url: string) {
+  localStorage.setItem(`chat-avatar-${room}`, url);
+}
+
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -151,6 +169,13 @@ export default function ChatPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [myMood, setMyMood] = useState<string | null>(null);
   const [userMoods, setUserMoods] = useState<Record<string, string>>({});
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarInput, setAvatarInput] = useState("");
+  const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingPublish = useRef(0);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
     if (room) {
       try {
@@ -170,6 +195,98 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Clean up stale typing indicators
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const next: Record<string, number> = {};
+        for (const [user, ts] of Object.entries(prev)) {
+          if (now - ts < 3000) next[user] = ts;
+        }
+        return Object.keys(next).length !== Object.keys(prev).length ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const subscribeAll = useCallback((channel: Ably.RealtimeChannel) => {
+    channel.subscribe("message", (msg: Ably.Message) => {
+      const data = msg.data as ChatMessage;
+      updateMessages((prev) => [...prev, data]);
+      if (data.sender !== nicknameRef.current) playBeep();
+    });
+    channel.subscribe("delete-message", (msg: Ably.Message) => {
+      const { messageId } = msg.data as { messageId: string };
+      updateMessages((prev) => prev.filter((m) => m.id !== messageId));
+    });
+    channel.subscribe("clear-all", () => updateMessages(() => []));
+    channel.subscribe("emotion", (msg: Ably.Message) => setEmotion({ ...(msg.data as EmotionEvent) }));
+    channel.subscribe("drawing", (msg: Ably.Message) => {
+      const data = msg.data as ChatMessage;
+      updateMessages((prev) => [...prev, data]);
+      if (data.sender !== nicknameRef.current) playBeep();
+    });
+    channel.subscribe("youtube", (msg: Ably.Message) => {
+      const data = msg.data as YouTubeEvent;
+      setYtVideo(data);
+      if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
+    });
+    channel.subscribe("youtube-seek", (msg: Ably.Message) => {
+      const { time } = msg.data as { time: number };
+      setYtSeekTo(time);
+    });
+    channel.subscribe("user-join", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
+    });
+    channel.subscribe("user-leave", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
+    });
+    channel.subscribe("mood", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; mood: string };
+      setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
+    });
+    channel.subscribe("avatar", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; url: string };
+      setUserAvatars((prev) => ({ ...prev, [data.nickname]: data.url }));
+    });
+    channel.subscribe("typing", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      if (data.nickname !== nicknameRef.current) {
+        setTypingUsers((prev) => ({ ...prev, [data.nickname]: Date.now() }));
+      }
+    });
+    channel.subscribe("reaction", (msg: Ably.Message) => {
+      const data = msg.data as { messageId: string; emoji: string; nickname: string };
+      updateMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== data.messageId) return m;
+          const reactions = { ...(m.reactions || {}) };
+          const users = reactions[data.emoji] ? [...reactions[data.emoji]] : [];
+          const idx = users.indexOf(data.nickname);
+          if (idx >= 0) {
+            users.splice(idx, 1);
+            if (users.length === 0) delete reactions[data.emoji];
+            else reactions[data.emoji] = users;
+          } else {
+            reactions[data.emoji] = [...users, data.nickname];
+          }
+          return { ...m, reactions };
+        })
+      );
+    });
+  }, [room]);
+
   // Auto-rejoin from saved session
   useEffect(() => {
     if (!room || joined) return;
@@ -177,63 +294,25 @@ export default function ChatPage() {
     if (session) {
       setNickname(session.nickname);
       setRoomPassword(ROOM_PASSWORD);
-      // Auto-join with saved session
       const stored = loadMessages(room);
       setMessages(stored);
       saveSession(room, session.nickname);
       nicknameRef.current = session.nickname;
 
+      const savedAvatar = getUserAvatar(room);
+      if (savedAvatar) {
+        setAvatarUrl(savedAvatar);
+        setAvatarInput(savedAvatar);
+      }
+
       const client = getAblyClient(session.nickname);
       const channel = client.channels.get(`chat-${room}`);
       channelRef.current = channel;
-
-      channel.subscribe("message", (msg: Ably.Message) => {
-        const data = msg.data as ChatMessage;
-        updateMessages((prev) => [...prev, data]);
-        if (data.sender !== nicknameRef.current) playBeep();
-      });
-      channel.subscribe("delete-message", (msg: Ably.Message) => {
-        const { messageId } = msg.data as { messageId: string };
-        updateMessages((prev) => prev.filter((m) => m.id !== messageId));
-      });
-      channel.subscribe("clear-all", () => updateMessages(() => []));
-      channel.subscribe("emotion", (msg: Ably.Message) => setEmotion({ ...(msg.data as EmotionEvent) }));
-      channel.subscribe("drawing", (msg: Ably.Message) => {
-        const data = msg.data as ChatMessage;
-        updateMessages((prev) => [...prev, data]);
-        if (data.sender !== nicknameRef.current) playBeep();
-      });
-      channel.subscribe("youtube", (msg: Ably.Message) => {
-        const data = msg.data as YouTubeEvent;
-        setYtVideo(data);
-        if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
-      });
-      channel.subscribe("youtube-seek", (msg: Ably.Message) => {
-        const { time } = msg.data as { time: number };
-        setYtSeekTo(time);
-      });
-      channel.subscribe("user-join", (msg: Ably.Message) => {
-        const data = msg.data as { nickname: string };
-        updateMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), sender: "sistema",
-          encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
-          timestamp: Date.now(), system: true,
-        }]);
-      });
-      channel.subscribe("user-leave", (msg: Ably.Message) => {
-        const data = msg.data as { nickname: string };
-        updateMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), sender: "sistema",
-          encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
-          timestamp: Date.now(), system: true,
-        }]);
-      });
-      channel.subscribe("mood", (msg: Ably.Message) => {
-        const data = msg.data as { nickname: string; mood: string };
-        setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
-      });
-
+      subscribeAll(channel);
       channel.publish("user-join", { nickname: session.nickname });
+      if (savedAvatar) {
+        channel.publish("avatar", { nickname: session.nickname, url: savedAvatar });
+      }
       setJoined(true);
     }
   }, [room]);
@@ -246,7 +325,6 @@ export default function ChatPage() {
     activityInterval.current = setInterval(() => {
       const session = getSession(room);
       if (!session) {
-        // Publish leave before disconnecting
         channelRef.current?.publish("user-leave", { nickname: nicknameRef.current });
         setJoined(false);
         setRoomPassword("");
@@ -295,83 +373,26 @@ export default function ChatPage() {
     saveSession(room, nickname.trim());
     nicknameRef.current = nickname.trim();
 
+    const savedAvatar = getUserAvatar(room);
+    if (savedAvatar) {
+      setAvatarUrl(savedAvatar);
+      setAvatarInput(savedAvatar);
+    }
+
     const client = getAblyClient(nickname.trim());
     const channel = client.channels.get(`chat-${room}`);
     channelRef.current = channel;
+    subscribeAll(channel);
 
-    channel.subscribe("message", (msg: Ably.Message) => {
-      const data = msg.data as ChatMessage;
-      updateMessages((prev) => [...prev, data]);
-      if (data.sender !== nicknameRef.current) playBeep();
-    });
-
-    channel.subscribe("delete-message", (msg: Ably.Message) => {
-      const { messageId } = msg.data as { messageId: string };
-      updateMessages((prev) => prev.filter((m) => m.id !== messageId));
-    });
-
-    channel.subscribe("clear-all", () => {
-      updateMessages(() => []);
-    });
-
-    channel.subscribe("emotion", (msg: Ably.Message) => {
-      const data = msg.data as EmotionEvent;
-      setEmotion({ ...data });
-    });
-
-    channel.subscribe("drawing", (msg: Ably.Message) => {
-      const data = msg.data as ChatMessage;
-      updateMessages((prev) => [...prev, data]);
-      if (data.sender !== nicknameRef.current) playBeep();
-    });
-
-    channel.subscribe("youtube", (msg: Ably.Message) => {
-      const data = msg.data as YouTubeEvent;
-      setYtVideo(data);
-      if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
-    });
-    channel.subscribe("youtube-seek", (msg: Ably.Message) => {
-      const { time } = msg.data as { time: number };
-      setYtSeekTo(time);
-    });
-
-    channel.subscribe("user-join", (msg: Ably.Message) => {
-      const data = msg.data as { nickname: string };
-      const sysMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        sender: "sistema",
-        encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
-        timestamp: Date.now(),
-        system: true,
-      };
-      updateMessages((prev) => [...prev, sysMsg]);
-    });
-
-    channel.subscribe("user-leave", (msg: Ably.Message) => {
-      const data = msg.data as { nickname: string };
-      const sysMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        sender: "sistema",
-        encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
-        timestamp: Date.now(),
-        system: true,
-      };
-      updateMessages((prev) => [...prev, sysMsg]);
-    });
-
-    channel.subscribe("mood", (msg: Ably.Message) => {
-      const data = msg.data as { nickname: string; mood: string };
-      setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
-    });
-
-    // Publish join event
-    channel.publish("user-join", { nickname: nickname.trim() });
-
-    // Publish leave on page unload
     const handleUnload = () => {
       channel.publish("user-leave", { nickname: nicknameRef.current });
     };
     window.addEventListener("beforeunload", handleUnload);
+
+    channel.publish("user-join", { nickname: nickname.trim() });
+    if (savedAvatar) {
+      channel.publish("avatar", { nickname: nickname.trim(), url: savedAvatar });
+    }
 
     setJoined(true);
   };
@@ -481,14 +502,41 @@ export default function ChatPage() {
     channelRef.current?.publish("youtube-seek", { time });
   };
 
+  const handleSaveAvatar = () => {
+    const url = avatarInput.trim();
+    setAvatarUrl(url);
+    if (room) saveUserAvatar(room, url);
+    setUserAvatars((prev) => ({ ...prev, [nickname]: url }));
+    channelRef.current?.publish("avatar", { nickname, url });
+    setShowAvatarDialog(false);
+    toast.success("Avatar atualizado!");
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    // Publish typing event (throttled)
+    if (channelRef.current && Date.now() - lastTypingPublish.current > 2000) {
+      lastTypingPublish.current = Date.now();
+      channelRef.current.publish("typing", { nickname });
+    }
+  };
+
+  const handleReaction = (messageId: string, emoji: string) => {
+    channelRef.current?.publish("reaction", { messageId, emoji, nickname });
+  };
+
+  const activeTypingUsers = Object.entries(typingUsers)
+    .filter(([user, ts]) => user !== nickname && Date.now() - ts < 3000)
+    .map(([user]) => user);
+
   const renderMessage = (msg: ChatMessage) => {
     const isSelf = msg.sender === nickname;
     const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
     const isEncrypted = decrypted === msg.encrypted;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
+    const senderAvatar = userAvatars[msg.sender];
 
-    // System messages (join/leave)
     if (msg.system) {
       return (
         <div key={msg.id} className="flex justify-center">
@@ -505,86 +553,159 @@ export default function ChatPage() {
       );
     }
 
+    const reactions = msg.reactions || {};
+    const reactionEntries = Object.entries(reactions).filter(([, users]) => users.length > 0);
+
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
-        <div
-          className={`max-w-[80%] sm:max-w-[75%] rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
-            isSelf
-              ? "bg-chat-self text-chat-self-foreground rounded-br-md"
-              : isEncrypted
-              ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
-              : "bg-chat-other text-chat-other-foreground rounded-bl-md"
-          }`}
-        >
-          {!isSelf && (
-            <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
-              {msg.sender}
-              {msg.mood && (
-                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
-              )}
-            </p>
-          )}
-          {isSelf && (
-            <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
-              {nickname}
-              {msg.mood && (
-                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
-              )}
-            </p>
-          )}
-
-          {msg.drawing ? (
-            <img
-              src={msg.drawing}
-              alt="Desenho"
-              className="max-w-full rounded-lg max-h-48 cursor-pointer"
-              onClick={() => setLightboxUrl(msg.drawing!)}
-            />
-          ) : msg.gif ? (
-            <img
-              src={msg.gif}
-              alt="GIF"
-              className="max-w-full rounded-lg max-h-48 cursor-pointer"
-              onClick={() => setLightboxUrl(msg.gif!)}
-            />
-          ) : (
-            <p
-              className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""}`}
-              style={msg.textColor ? { color: msg.textColor } : undefined}
-            >
-              {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-              {linkify(decrypted)}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between mt-1">
-            <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
-              {time}
-            </p>
-            {isAdmin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-                    title="Excluir mensagem"
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta mensagem será excluída para todos.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteMessage(msg.id)}>Excluir</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+        {/* Avatar for others */}
+        {!isSelf && senderAvatar && (
+          <img
+            src={senderAvatar}
+            alt={msg.sender}
+            className="h-7 w-7 rounded-full object-cover mr-1.5 mt-1 shrink-0 border border-border"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
+        <div className="flex flex-col">
+          <div
+            className={`max-w-[80%] sm:max-w-[75%] rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
+              isSelf
+                ? "bg-chat-self text-chat-self-foreground rounded-br-md"
+                : isEncrypted
+                ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
+                : "bg-chat-other text-chat-other-foreground rounded-bl-md"
+            }`}
+          >
+            {!isSelf && (
+              <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
+                {msg.sender}
+                {msg.mood && (
+                  <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
+                )}
+              </p>
             )}
+            {isSelf && (
+              <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
+                {nickname}
+                {msg.mood && (
+                  <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
+                )}
+              </p>
+            )}
+
+            {msg.drawing ? (
+              <img
+                src={msg.drawing}
+                alt="Desenho"
+                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                onClick={() => setLightboxUrl(msg.drawing!)}
+              />
+            ) : msg.gif ? (
+              <img
+                src={msg.gif}
+                alt="GIF"
+                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                onClick={() => setLightboxUrl(msg.gif!)}
+              />
+            ) : (
+              <p
+                className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""}`}
+                style={msg.textColor ? { color: msg.textColor } : undefined}
+              >
+                {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
+                {linkify(decrypted)}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between mt-1">
+              <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
+                {time}
+              </p>
+              <div className="flex items-center gap-1">
+                {/* Reaction button */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Reagir"
+                    >
+                      <SmilePlus className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-1.5" side="top" align="end">
+                    <div className="flex gap-1">
+                      {REACTION_EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(msg.id, emoji)}
+                          className="text-lg hover:scale-125 transition-transform p-0.5"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {isAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        title="Excluir mensagem"
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                        <AlertDialogDescription>Esta mensagem será excluída para todos.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteMessage(msg.id)}>Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Reactions display */}
+          {reactionEntries.length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-1 ${isSelf ? "justify-end" : "justify-start"}`}>
+              {reactionEntries.map(([emoji, users]) => {
+                const iReacted = users.includes(nickname);
+                return (
+                  <button
+                    key={emoji}
+                    onClick={() => handleReaction(msg.id, emoji)}
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                      iReacted
+                        ? "bg-primary/10 border-primary/30 text-foreground"
+                        : "bg-muted/50 border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    title={users.join(", ")}
+                  >
+                    <span>{emoji}</span>
+                    <span className="text-[10px]">{users.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
+        {/* Avatar for self */}
+        {isSelf && avatarUrl && (
+          <img
+            src={avatarUrl}
+            alt={nickname}
+            className="h-7 w-7 rounded-full object-cover ml-1.5 mt-1 shrink-0 border border-border"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
       </div>
     );
   };
@@ -637,6 +758,52 @@ export default function ChatPage() {
           {lightboxUrl && (
             <img src={lightboxUrl} alt="Preview" className="w-full h-full object-contain max-h-[85vh] rounded" />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Avatar URL Dialog */}
+      <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Foto de perfil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {avatarInput && (
+              <div className="flex justify-center">
+                <img
+                  src={avatarInput}
+                  alt="Preview"
+                  className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                  onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
+                />
+              </div>
+            )}
+            <Input
+              placeholder="Cole a URL da imagem..."
+              value={avatarInput}
+              onChange={(e) => setAvatarInput(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setAvatarInput("");
+                  setAvatarUrl("");
+                  if (room) saveUserAvatar(room, "");
+                  setUserAvatars((prev) => ({ ...prev, [nickname]: "" }));
+                  channelRef.current?.publish("avatar", { nickname, url: "" });
+                  setShowAvatarDialog(false);
+                  toast.success("Avatar removido!");
+                }}
+              >
+                Remover
+              </Button>
+              <Button className="flex-1" onClick={handleSaveAvatar} disabled={!avatarInput.trim()}>
+                Salvar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -724,6 +891,17 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Typing indicator */}
+      {activeTypingUsers.length > 0 && (
+        <div className="px-4 pb-1">
+          <p className="text-xs text-muted-foreground italic animate-pulse">
+            {activeTypingUsers.length === 1
+              ? `${activeTypingUsers[0]} está digitando...`
+              : `${activeTypingUsers.join(", ")} estão digitando...`}
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3">
         <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
           <ColorPicker value={textColor} onChange={setTextColor} />
@@ -736,6 +914,16 @@ export default function ChatPage() {
             title="Desenhar"
           >
             <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setShowAvatarDialog(true)}
+            title="Foto de perfil"
+          >
+            <Camera className="h-3.5 w-3.5" />
           </Button>
           <div className="border-l border-border h-6 mx-1" />
           <EmotionBar onSend={handleSendEmotion} />
@@ -765,7 +953,7 @@ export default function ChatPage() {
           <Textarea
             placeholder="Digite sua mensagem..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
