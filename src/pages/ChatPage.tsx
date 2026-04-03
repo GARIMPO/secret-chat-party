@@ -420,6 +420,7 @@ export default function ChatPage() {
       encrypted: encryptMessage("🎨 Desenho", ROOM_PASSWORD),
       timestamp: Date.now(),
       drawing: dataUrl,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
   };
