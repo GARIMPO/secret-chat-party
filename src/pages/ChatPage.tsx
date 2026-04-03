@@ -227,6 +227,10 @@ export default function ChatPage() {
           timestamp: Date.now(), system: true,
         }]);
       });
+      channel.subscribe("mood", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string; mood: string };
+        setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
+      });
 
       channel.publish("user-join", { nickname: session.nickname });
       setJoined(true);
