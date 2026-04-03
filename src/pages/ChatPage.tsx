@@ -22,6 +22,7 @@ import EmotionOverlay from "@/components/chat/EmotionOverlay";
 import ColorPicker from "@/components/chat/ColorPicker";
 import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
+import MoodPicker from "@/components/chat/MoodPicker";
 import {
   Dialog,
   DialogContent,
