@@ -258,6 +258,15 @@ export default function ChatPage() {
     });
   }, [room]);
 
+  const saveYtState = useCallback((evt: YouTubeEvent) => {
+    setYtVideo(evt);
+    if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
+  }, [room]);
+
+  const handleYouTubeSeek = useCallback((time: number) => {
+    channelRef.current?.publish("youtube-seek", { time });
+  }, []);
+
   if (!room) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
