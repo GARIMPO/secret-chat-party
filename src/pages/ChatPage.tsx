@@ -429,25 +429,34 @@ export default function ChatPage() {
     }
   };
 
+  const saveYtState = useCallback((evt: YouTubeEvent) => {
+    setYtVideo(evt);
+    if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
+  }, [room]);
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
-    setYtVideo(evt);
+    saveYtState(evt);
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
   };
 
   const handleYouTubeToggle = () => {
     const evt: YouTubeEvent = { ...ytVideo, isPlaying: !ytVideo.isPlaying };
-    setYtVideo(evt);
+    saveYtState(evt);
     channelRef.current?.publish("youtube", evt);
   };
 
   const handleYouTubeClose = () => {
     const evt: YouTubeEvent = { videoId: null, isPlaying: false };
-    setYtVideo(evt);
+    saveYtState(evt);
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
   };
+
+  const handleYouTubeSeek = useCallback((time: number) => {
+    channelRef.current?.publish("youtube-seek", { time });
+  }, []);
 
   const renderMessage = (msg: ChatMessage) => {
     const isSelf = msg.sender === nickname;
