@@ -387,6 +387,7 @@ export default function ChatPage() {
       encrypted,
       timestamp: Date.now(),
       textColor: textColor || undefined,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
     setInput("");
