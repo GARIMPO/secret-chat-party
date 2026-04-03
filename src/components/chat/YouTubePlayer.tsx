@@ -74,16 +74,20 @@ export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogg
           </Button>
         </div>
       </div>
-      {/* Video */}
+      {/* Video - smaller on desktop, full on mobile */}
       {!minimized && (
-        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1`}
-            className="absolute inset-0 w-full h-full"
-            allow="autoplay; encrypted-media; fullscreen"
-            allowFullScreen
-            title="YouTube player"
-          />
+        <div className="flex justify-center bg-black">
+          <div className="w-full sm:max-w-[50%] lg:max-w-[40%]">
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1`}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                title="YouTube player"
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
