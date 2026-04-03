@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, ChevronUp, Pencil } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -20,10 +20,22 @@ import EmotionBar from "@/components/chat/EmotionBar";
 import EmotionOverlay from "@/components/chat/EmotionOverlay";
 import ColorPicker from "@/components/chat/ColorPicker";
 import DrawingCanvas from "@/components/chat/DrawingCanvas";
+import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ChatMessage {
   id: string;
@@ -31,7 +43,6 @@ interface ChatMessage {
   encrypted: string;
   timestamp: number;
   textColor?: string;
-  attachment?: { name: string; url: string; type: string };
   gif?: string;
   drawing?: string;
 }
@@ -39,6 +50,11 @@ interface ChatMessage {
 interface EmotionEvent {
   emoji: string;
   id: string;
+}
+
+interface YouTubeEvent {
+  videoId: string | null;
+  isPlaying: boolean;
 }
 
 const CHAT_FONT_SIZES: Record<string, string> = {
@@ -50,7 +66,23 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 };
 
 const ROOM_PASSWORD = "entrar2025";
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
+
+// URL regex for linkifying
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function linkify(text: string) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) =>
+    URL_REGEX.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-primary break-all">
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 function loadMessages(room: string): ChatMessage[] {
   try {
@@ -107,12 +139,13 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [textColor, setTextColor] = useState("");
-  const [chatFontSize, setChatFontSize] = useState("normal");
+  const [chatFontSize, setChatFontSize] = useState("large");
   const [showGifPicker, setShowGifPicker] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [ytVideo, setYtVideo] = useState<YouTubeEvent>({ videoId: null, isPlaying: false });
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activityInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -121,7 +154,6 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Check for existing session on mount
   useEffect(() => {
     if (!room) return;
     const session = getSession(room);
@@ -131,17 +163,11 @@ export default function ChatPage() {
     }
   }, [room]);
 
-  // Activity tracker
   useEffect(() => {
     if (!joined || !room) return;
-
     const trackActivity = () => updateSessionActivity(room);
-
-    // Update on user interactions
     const events = ["mousemove", "keydown", "touchstart", "scroll"];
     events.forEach((e) => window.addEventListener(e, trackActivity, { passive: true }));
-
-    // Periodic check for inactivity
     activityInterval.current = setInterval(() => {
       const session = getSession(room);
       if (!session) {
@@ -152,7 +178,6 @@ export default function ChatPage() {
         toast.info("Sessão expirada por inatividade");
       }
     }, 30000);
-
     return () => {
       events.forEach((e) => window.removeEventListener(e, trackActivity));
       if (activityInterval.current) clearInterval(activityInterval.current);
@@ -220,6 +245,11 @@ export default function ChatPage() {
       updateMessages((prev) => [...prev, data]);
     });
 
+    channel.subscribe("youtube", (msg: Ably.Message) => {
+      const data = msg.data as YouTubeEvent;
+      setYtVideo(data);
+    });
+
     setJoined(true);
   };
 
@@ -228,7 +258,6 @@ export default function ChatPage() {
     if (!input.trim() || !channelRef.current) return;
 
     const encrypted = encryptMessage(input.trim(), ROOM_PASSWORD);
-
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: nickname,
@@ -236,7 +265,6 @@ export default function ChatPage() {
       timestamp: Date.now(),
       textColor: textColor || undefined,
     };
-
     channelRef.current.publish("message", msg);
     setInput("");
     updateSessionActivity(room);
@@ -281,12 +309,32 @@ export default function ChatPage() {
     toast.success("Histórico apagado!");
   };
 
+  const handleYouTubeSubmit = (videoId: string) => {
+    const evt: YouTubeEvent = { videoId, isPlaying: true };
+    setYtVideo(evt);
+    channelRef.current?.publish("youtube", evt);
+    setShowYouTubeInput(false);
+  };
+
+  const handleYouTubeToggle = () => {
+    const evt: YouTubeEvent = { ...ytVideo, isPlaying: !ytVideo.isPlaying };
+    setYtVideo(evt);
+    channelRef.current?.publish("youtube", evt);
+  };
+
+  const handleYouTubeClose = () => {
+    const evt: YouTubeEvent = { videoId: null, isPlaying: false };
+    setYtVideo(evt);
+    channelRef.current?.publish("youtube", evt);
+    setShowYouTubeInput(false);
+  };
+
   const renderMessage = (msg: ChatMessage) => {
     const isSelf = msg.sender === nickname;
     const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
     const isEncrypted = decrypted === msg.encrypted;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-sm";
+    const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
 
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
@@ -300,7 +348,7 @@ export default function ChatPage() {
           }`}
         >
           {!isSelf && (
-            <p className={`text-sm font-bold mb-0.5 ${isEncrypted ? "text-chat-encrypted-foreground/70" : "text-primary"}`}>
+            <p className="text-sm font-bold mb-0.5 text-primary">
               {msg.sender}
             </p>
           )}
@@ -325,7 +373,7 @@ export default function ChatPage() {
               style={msg.textColor ? { color: msg.textColor } : undefined}
             >
               {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-              {decrypted}
+              {linkify(decrypted)}
             </p>
           )}
 
@@ -334,13 +382,26 @@ export default function ChatPage() {
               {time}
             </p>
             {isAdmin && (
-              <button
-                onClick={() => handleDeleteMessage(msg.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-                title="Excluir mensagem"
-              >
-                <Trash2 className="h-3 w-3 text-destructive" />
-              </button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                    title="Excluir mensagem"
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta mensagem será excluída para todos.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteMessage(msg.id)}>Excluir</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </div>
@@ -377,9 +438,7 @@ export default function ChatPage() {
               onChange={(e) => setRoomPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full active:scale-[0.97]">
-            Entrar na sala
-          </Button>
+          <Button type="submit" className="w-full active:scale-[0.97]">Entrar na sala</Button>
         </form>
       </div>
     );
@@ -422,11 +481,38 @@ export default function ChatPage() {
               <SelectItem value="xxlarge">Enorme</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" onClick={handleClearAll} title="Apagar histórico" className="h-8 w-8">
-            <Trash2 className="h-4 w-4 text-destructive" />
+          <Button variant="ghost" size="icon" onClick={() => setShowYouTubeInput(!showYouTubeInput)} title="YouTube" className="h-8 w-8">
+            <Music className="h-4 w-4 text-primary" />
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" title="Apagar histórico" className="h-8 w-8">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apagar todo o histórico?</AlertDialogTitle>
+                <AlertDialogDescription>Todas as mensagens desta sala serão apagadas permanentemente para todos.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearAll}>Apagar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </header>
+
+      {(showYouTubeInput || ytVideo.videoId) && (
+        <YouTubePlayer
+          videoId={ytVideo.videoId}
+          isPlaying={ytVideo.isPlaying}
+          onSubmitLink={handleYouTubeSubmit}
+          onTogglePlay={handleYouTubeToggle}
+          onClose={handleYouTubeClose}
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
         {messages.length === 0 && (
@@ -439,48 +525,34 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3">
-        {/* Collapsible toolbar */}
-        {showToolbar && (
-          <div className="flex items-center gap-2 mb-2 flex-wrap px-1 animate-in slide-in-from-bottom-2 duration-200">
-            <ColorPicker value={textColor} onChange={setTextColor} />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setShowDrawing(true)}
-              title="Desenhar"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <div className="border-l border-border h-6 mx-1" />
-            <EmotionBar onSend={handleSendEmotion} />
-          </div>
-        )}
+        {/* Always visible toolbar */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
+          <ColorPicker value={textColor} onChange={setTextColor} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setShowDrawing(true)}
+            title="Desenhar"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <div className="border-l border-border h-6 mx-1" />
+          <EmotionBar onSend={handleSendEmotion} />
+        </div>
 
         <div className="flex gap-2 relative items-end">
-          <div className="flex flex-col gap-1 shrink-0">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowToolbar(!showToolbar)}
-              title="Ferramentas"
-              className="h-8 w-8"
-            >
-              <ChevronUp className={`h-4 w-4 transition-transform ${showToolbar ? "rotate-180" : ""}`} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowGifPicker(!showGifPicker)}
-              title="Enviar GIF"
-              className="h-8 w-8"
-            >
-              <span className="text-[10px] font-bold leading-none">GIF</span>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowGifPicker(!showGifPicker)}
+            title="Enviar GIF"
+            className="h-8 w-8 shrink-0"
+          >
+            <span className="text-[10px] font-bold leading-none">GIF</span>
+          </Button>
           {showGifPicker && (
             <GifPicker
               onSelect={handleSendGif}
