@@ -57,6 +57,7 @@ interface EmotionEvent {
 interface YouTubeEvent {
   videoId: string | null;
   isPlaying: boolean;
+  seekTime?: number;
 }
 
 const CHAT_FONT_SIZES: Record<string, string> = {
