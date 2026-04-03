@@ -402,6 +402,7 @@ export default function ChatPage() {
       encrypted: encryptMessage("GIF", ROOM_PASSWORD),
       timestamp: Date.now(),
       gif: gifUrl,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
   };
