@@ -167,7 +167,7 @@ export default function YouTubePlayer({
         </div>
       </div>
       {!minimized && (
-        <div className="flex justify-center">
+        <div className="flex justify-center bg-black">
           <div className="w-full sm:max-w-[50%] lg:max-w-[40%]">
             <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
               <div ref={containerRef} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
