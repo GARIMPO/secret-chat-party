@@ -541,85 +541,131 @@ export default function ChatPage() {
       );
     }
 
+    const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "👎"];
+    const reactions = msg.reactions || {};
+
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
-        <div
-          className={`max-w-[80%] sm:max-w-[75%] rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
-            isSelf
-              ? "bg-chat-self text-chat-self-foreground rounded-br-md"
-              : isEncrypted
-              ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
-              : "bg-chat-other text-chat-other-foreground rounded-bl-md"
-          }`}
-        >
-          {!isSelf && (
-            <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
-              {msg.sender}
-              {msg.mood && (
-                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
-              )}
-            </p>
-          )}
-          {isSelf && (
-            <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
-              {nickname}
-              {msg.mood && (
-                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
-              )}
-            </p>
-          )}
-
-          {msg.drawing ? (
-            <img
-              src={msg.drawing}
-              alt="Desenho"
-              className="max-w-full rounded-lg max-h-48 cursor-pointer"
-              onClick={() => setLightboxUrl(msg.drawing!)}
-            />
-          ) : msg.gif ? (
-            <img
-              src={msg.gif}
-              alt="GIF"
-              className="max-w-full rounded-lg max-h-48 cursor-pointer"
-              onClick={() => setLightboxUrl(msg.gif!)}
-            />
-          ) : (
-            <p
-              className={`${displayFontSize} leading-relaxed break-words ${isEncrypted ? "font-mono text-xs" : ""}`}
-              style={msg.textColor ? { color: msg.textColor } : undefined}
-            >
-              {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-              {linkify(decrypted)}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between mt-1">
-            <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
-              {time}
-            </p>
-            {isAdmin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-                    title="Excluir mensagem"
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta mensagem será excluída para todos.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteMessage(msg.id)}>Excluir</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+        <div className={`inline-block max-w-[85%] sm:max-w-[75%]`}>
+          <div
+            className={`rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
+              isSelf
+                ? "bg-chat-self text-chat-self-foreground rounded-br-md"
+                : isEncrypted
+                ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
+                : "bg-chat-other text-chat-other-foreground rounded-bl-md"
+            }`}
+          >
+            {!isSelf && (
+              <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
+                {msg.sender}
+                {msg.mood && (
+                  <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
+                )}
+              </p>
             )}
+            {isSelf && (
+              <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
+                {nickname}
+                {msg.mood && (
+                  <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
+                )}
+              </p>
+            )}
+
+            {msg.drawing ? (
+              <img
+                src={msg.drawing}
+                alt="Desenho"
+                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                onClick={() => setLightboxUrl(msg.drawing!)}
+              />
+            ) : msg.gif ? (
+              <img
+                src={msg.gif}
+                alt="GIF"
+                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                onClick={() => setLightboxUrl(msg.gif!)}
+              />
+            ) : (
+              <p
+                className={`${displayFontSize} leading-relaxed break-words whitespace-pre-wrap word-break-break-word ${isEncrypted ? "font-mono text-xs" : ""}`}
+                style={{
+                  ...(msg.textColor ? { color: msg.textColor } : {}),
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                }}
+              >
+                {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
+                {linkify(decrypted)}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between mt-1">
+              <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
+                {time}
+              </p>
+              <div className="flex items-center gap-1">
+                {isAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Excluir mensagem"
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                        <AlertDialogDescription>Esta mensagem será excluída para todos.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteMessage(msg.id)}>Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Reaction bar - shown on hover */}
+          <div className={`flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isSelf ? "justify-end" : "justify-start"}`}>
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => handleReaction(msg.id, emoji)}
+                className="text-sm hover:scale-125 transition-transform px-0.5"
+                title={`Reagir com ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          {/* Display existing reactions */}
+          {Object.keys(reactions).length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-1 ${isSelf ? "justify-end" : "justify-start"}`}>
+              {Object.entries(reactions).map(([emoji, users]) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleReaction(msg.id, emoji)}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                    users.includes(nickname)
+                      ? "bg-primary/20 border-primary/40 text-foreground"
+                      : "bg-muted/50 border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                  title={users.join(", ")}
+                >
+                  <span>{emoji}</span>
+                  <span>{users.length}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
