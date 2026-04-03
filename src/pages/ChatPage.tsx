@@ -737,25 +737,27 @@ export default function ChatPage() {
           <EmotionBar onSend={handleSendEmotion} />
           <div className="border-l border-border h-6 mx-1" />
           <MoodPicker currentMood={myMood} onSelect={handleMoodChange} />
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGifPicker(!showGifPicker)}
+              title="Enviar GIF"
+              className="h-8 px-2"
+            >
+              <span className="text-[10px] font-bold leading-none">GIF</span>
+            </Button>
+            {showGifPicker && (
+              <GifPicker
+                onSelect={handleSendGif}
+                onClose={() => setShowGifPicker(false)}
+              />
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 relative items-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowGifPicker(!showGifPicker)}
-            title="Enviar GIF"
-            className="h-8 w-8 shrink-0"
-          >
-            <span className="text-[10px] font-bold leading-none">GIF</span>
-          </Button>
-          {showGifPicker && (
-            <GifPicker
-              onSelect={handleSendGif}
-              onClose={() => setShowGifPicker(false)}
-            />
-          )}
           <Textarea
             placeholder="Digite sua mensagem..."
             value={input}

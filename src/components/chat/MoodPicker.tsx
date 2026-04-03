@@ -7,6 +7,8 @@ const MOODS = [
   { emoji: "😐", label: "Neutro" },
   { emoji: "😥", label: "Triste" },
   { emoji: "😡", label: "Bravo" },
+  { emoji: "☁️", label: "Nuvem" },
+  { emoji: "🤡", label: "Palhaço" },
 ];
 
 interface MoodPickerProps {
