@@ -156,12 +156,59 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Auto-rejoin from saved session
   useEffect(() => {
-    if (!room) return;
+    if (!room || joined) return;
     const session = getSession(room);
     if (session) {
       setNickname(session.nickname);
       setRoomPassword(ROOM_PASSWORD);
+      // Auto-join with saved session
+      const stored = loadMessages(room);
+      setMessages(stored);
+      saveSession(room, session.nickname);
+      nicknameRef.current = session.nickname;
+
+      const client = getAblyClient(session.nickname);
+      const channel = client.channels.get(`chat-${room}`);
+      channelRef.current = channel;
+
+      channel.subscribe("message", (msg: Ably.Message) => {
+        const data = msg.data as ChatMessage;
+        updateMessages((prev) => [...prev, data]);
+        if (data.sender !== nicknameRef.current) playBeep();
+      });
+      channel.subscribe("delete-message", (msg: Ably.Message) => {
+        const { messageId } = msg.data as { messageId: string };
+        updateMessages((prev) => prev.filter((m) => m.id !== messageId));
+      });
+      channel.subscribe("clear-all", () => updateMessages(() => []));
+      channel.subscribe("emotion", (msg: Ably.Message) => setEmotion({ ...(msg.data as EmotionEvent) }));
+      channel.subscribe("drawing", (msg: Ably.Message) => {
+        const data = msg.data as ChatMessage;
+        updateMessages((prev) => [...prev, data]);
+        if (data.sender !== nicknameRef.current) playBeep();
+      });
+      channel.subscribe("youtube", (msg: Ably.Message) => setYtVideo(msg.data as YouTubeEvent));
+      channel.subscribe("user-join", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string };
+        updateMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }]);
+      });
+      channel.subscribe("user-leave", (msg: Ably.Message) => {
+        const data = msg.data as { nickname: string };
+        updateMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }]);
+      });
+
+      channel.publish("user-join", { nickname: session.nickname });
+      setJoined(true);
     }
   }, [room]);
 
