@@ -48,6 +48,7 @@ interface ChatMessage {
   gif?: string;
   drawing?: string;
   system?: boolean;
+  mood?: string;
 }
 
 interface EmotionEvent {
@@ -386,6 +387,7 @@ export default function ChatPage() {
       encrypted,
       timestamp: Date.now(),
       textColor: textColor || undefined,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
     setInput("");
@@ -400,6 +402,7 @@ export default function ChatPage() {
       encrypted: encryptMessage("GIF", ROOM_PASSWORD),
       timestamp: Date.now(),
       gif: gifUrl,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
   };
@@ -417,6 +420,7 @@ export default function ChatPage() {
       encrypted: encryptMessage("🎨 Desenho", ROOM_PASSWORD),
       timestamp: Date.now(),
       drawing: dataUrl,
+      mood: myMood || undefined,
     };
     channelRef.current.publish("message", msg);
   };
@@ -515,16 +519,16 @@ export default function ChatPage() {
           {!isSelf && (
             <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
               {msg.sender}
-              {userMoods[msg.sender] && (
-                <span className="text-lg animate-mood-bounce inline-block">{userMoods[msg.sender]}</span>
+              {msg.mood && (
+                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
               )}
             </p>
           )}
           {isSelf && (
             <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
               {nickname}
-              {myMood && (
-                <span className="text-lg animate-mood-bounce inline-block">{myMood}</span>
+              {msg.mood && (
+                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
               )}
             </p>
           )}
