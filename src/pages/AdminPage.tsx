@@ -1,14 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setRoomPassword, getAllRoomPasswords, deleteRoomPassword } from "@/store/roomPasswords";
 import { Shield, Plus, Trash2, Copy, LogOut, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ADMIN_LOGIN = "Jafuis";
 const ADMIN_PASSWORD = "Markinhos";
 const DEFAULT_ROOM_PASSWORD = "entrar2025";
+const ADMIN_SESSION_KEY = "admin-session";
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -18,14 +30,30 @@ export default function AdminPage() {
   const [newRoom, setNewRoom] = useState("");
   const [rooms, setRooms] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    try {
+      const session = localStorage.getItem(ADMIN_SESSION_KEY);
+      if (session === "true") {
+        setIsAuthenticated(true);
+        setRooms(getAllRoomPasswords());
+      }
+    } catch {}
+  }, []);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
+      localStorage.setItem(ADMIN_SESSION_KEY, "true");
       setRooms(getAllRoomPasswords());
     } else {
       toast.error("Login ou senha inválidos");
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem(ADMIN_SESSION_KEY);
   };
 
   const handleAddRoom = (e: React.FormEvent) => {
@@ -72,22 +100,10 @@ export default function AdminPage() {
             <p className="text-sm text-muted-foreground">Entre para gerenciar salas</p>
           </div>
           <div className="space-y-3">
-            <Input
-              placeholder="Login"
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              autoFocus
-            />
-            <Input
-              type="password"
-              placeholder="Senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <Input placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} autoFocus />
+            <Input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" className="w-full active:scale-[0.97]">
-            Entrar
-          </Button>
+          <Button type="submit" className="w-full active:scale-[0.97]">Entrar</Button>
         </form>
       </div>
     );
@@ -102,7 +118,7 @@ export default function AdminPage() {
           <Shield className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold text-foreground">Gerenciar Salas</h1>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => { setIsAuthenticated(false); navigate("/admin"); }}>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
           <LogOut className="h-4 w-4 mr-1" /> Sair
         </Button>
       </header>
@@ -125,9 +141,7 @@ export default function AdminPage() {
           )}
           {roomEntries.map(([room]) => (
             <div key={room} className="flex items-center justify-between rounded-xl bg-surface p-4 shadow-sm border border-border">
-              <div>
-                <p className="font-medium text-foreground">{room}</p>
-              </div>
+              <p className="font-medium text-foreground">{room}</p>
               <div className="flex gap-1">
                 <Button variant="ghost" size="icon" onClick={() => navigate(`/chat?room=${encodeURIComponent(room)}&admin=true`)} title="Entrar na sala">
                   <MessageCircle className="h-4 w-4 text-primary" />
@@ -135,12 +149,40 @@ export default function AdminPage() {
                 <Button variant="ghost" size="icon" onClick={() => copyLink(room)} title="Copiar link">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleClearChat(room)} title="Apagar histórico">
-                  <Trash2 className="h-4 w-4 text-orange-500" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Remover sala">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Apagar histórico">
+                      <Trash2 className="h-4 w-4 text-orange-500" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Apagar histórico?</AlertDialogTitle>
+                      <AlertDialogDescription>Todo o histórico de mensagens da sala "{room}" será apagado permanentemente.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleClearChat(room)}>Apagar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Remover sala">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remover sala?</AlertDialogTitle>
+                      <AlertDialogDescription>A sala "{room}" será removida permanentemente.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(room)}>Remover</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           ))}
