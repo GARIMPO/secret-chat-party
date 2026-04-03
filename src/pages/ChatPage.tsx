@@ -148,6 +148,8 @@ export default function ChatPage() {
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [myMood, setMyMood] = useState<string | null>(null);
+  const [userMoods, setUserMoods] = useState<Record<string, string>>({});
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
     if (room) {
       try {
