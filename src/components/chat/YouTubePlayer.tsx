@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, X, Play, Pause, Send } from "lucide-react";
+import { Music, X, Send, ChevronDown, ChevronUp } from "lucide-react";
 
 interface YouTubePlayerProps {
   videoId: string | null;
@@ -25,6 +25,7 @@ function extractVideoId(url: string): string | null {
 
 export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogglePlay, onClose }: YouTubePlayerProps) {
   const [linkInput, setLinkInput] = useState("");
+  const [minimized, setMinimized] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,26 +36,11 @@ export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogg
     }
   };
 
-  return (
-    <div className="border-b border-border bg-surface px-3 py-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Music className="h-4 w-4 text-primary shrink-0" />
-        {videoId ? (
-          <>
-            <iframe
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1`}
-              className="w-48 h-12 rounded"
-              allow="autoplay; encrypted-media"
-              title="YouTube player"
-            />
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onTogglePlay}>
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-              <X className="h-4 w-4 text-destructive" />
-            </Button>
-          </>
-        ) : (
+  if (!videoId) {
+    return (
+      <div className="border-b border-border bg-surface px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Music className="h-4 w-4 text-primary shrink-0" />
           <form onSubmit={handleSubmit} className="flex gap-2 flex-1 min-w-0">
             <Input
               placeholder="Cole link do YouTube..."
@@ -66,8 +52,40 @@ export default function YouTubePlayer({ videoId, isPlaying, onSubmitLink, onTogg
               <Send className="h-3 w-3" />
             </Button>
           </form>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="border-b border-border bg-black">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-surface border-b border-border">
+        <div className="flex items-center gap-2">
+          <Music className="h-4 w-4 text-primary" />
+          <span className="text-xs text-muted-foreground font-medium">Assistindo juntos</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMinimized(!minimized)}>
+            {minimized ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+            <X className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      </div>
+      {/* Video */}
+      {!minimized && (
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1`}
+            className="absolute inset-0 w-full h-full"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            title="YouTube player"
+          />
+        </div>
+      )}
     </div>
   );
 }

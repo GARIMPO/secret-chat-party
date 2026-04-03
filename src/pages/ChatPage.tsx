@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getAblyClient } from "@/lib/ably";
 import { encryptMessage, decryptMessage } from "@/lib/crypto";
+import { playBeep } from "@/lib/beep";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -12,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -45,6 +46,7 @@ interface ChatMessage {
   textColor?: string;
   gif?: string;
   drawing?: string;
+  system?: boolean;
 }
 
 interface EmotionEvent {
@@ -68,7 +70,6 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 const ROOM_PASSWORD = "entrar2025";
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
 
-// URL regex for linkifying
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
 function linkify(text: string) {
@@ -149,6 +150,7 @@ export default function ChatPage() {
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activityInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nicknameRef = useRef("");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -171,6 +173,8 @@ export default function ChatPage() {
     activityInterval.current = setInterval(() => {
       const session = getSession(room);
       if (!session) {
+        // Publish leave before disconnecting
+        channelRef.current?.publish("user-leave", { nickname: nicknameRef.current });
         setJoined(false);
         setRoomPassword("");
         channelRef.current?.detach();
@@ -216,6 +220,7 @@ export default function ChatPage() {
     const stored = loadMessages(room);
     setMessages(stored);
     saveSession(room, nickname.trim());
+    nicknameRef.current = nickname.trim();
 
     const client = getAblyClient(nickname.trim());
     const channel = client.channels.get(`chat-${room}`);
@@ -224,6 +229,7 @@ export default function ChatPage() {
     channel.subscribe("message", (msg: Ably.Message) => {
       const data = msg.data as ChatMessage;
       updateMessages((prev) => [...prev, data]);
+      if (data.sender !== nicknameRef.current) playBeep();
     });
 
     channel.subscribe("delete-message", (msg: Ably.Message) => {
@@ -243,12 +249,46 @@ export default function ChatPage() {
     channel.subscribe("drawing", (msg: Ably.Message) => {
       const data = msg.data as ChatMessage;
       updateMessages((prev) => [...prev, data]);
+      if (data.sender !== nicknameRef.current) playBeep();
     });
 
     channel.subscribe("youtube", (msg: Ably.Message) => {
       const data = msg.data as YouTubeEvent;
       setYtVideo(data);
     });
+
+    channel.subscribe("user-join", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      const sysMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        sender: "sistema",
+        encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+        timestamp: Date.now(),
+        system: true,
+      };
+      updateMessages((prev) => [...prev, sysMsg]);
+    });
+
+    channel.subscribe("user-leave", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      const sysMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        sender: "sistema",
+        encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
+        timestamp: Date.now(),
+        system: true,
+      };
+      updateMessages((prev) => [...prev, sysMsg]);
+    });
+
+    // Publish join event
+    channel.publish("user-join", { nickname: nickname.trim() });
+
+    // Publish leave on page unload
+    const handleUnload = () => {
+      channel.publish("user-leave", { nickname: nicknameRef.current });
+    };
+    window.addEventListener("beforeunload", handleUnload);
 
     setJoined(true);
   };
@@ -336,6 +376,23 @@ export default function ChatPage() {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
 
+    // System messages (join/leave)
+    if (msg.system) {
+      return (
+        <div key={msg.id} className="flex justify-center">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 text-muted-foreground text-xs">
+            {decrypted.includes("entrou") ? (
+              <LogIn className="h-3 w-3 text-green-500" />
+            ) : (
+              <LogOut className="h-3 w-3 text-red-400" />
+            )}
+            <span>{decrypted}</span>
+            <span className="text-[10px] opacity-60">{time}</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
         <div
@@ -411,7 +468,7 @@ export default function ChatPage() {
 
   if (!joined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background p-4">
         <form
           onSubmit={handleJoin}
           className="w-full max-w-sm space-y-6 rounded-2xl bg-surface p-6 sm:p-8 shadow-lg shadow-primary/5 border border-border"
@@ -525,7 +582,6 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3">
-        {/* Always visible toolbar */}
         <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
           <ColorPicker value={textColor} onChange={setTextColor} />
           <Button
