@@ -233,6 +233,21 @@ export default function ChatPage() {
         const data = msg.data as { nickname: string; mood: string };
         setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
       });
+      channel.subscribe("reaction", (msg: Ably.Message) => {
+        const data = msg.data as { messageId: string; emoji: string; nickname: string };
+        updateMessages((prev) => prev.map((m) => {
+          if (m.id !== data.messageId) return m;
+          const reactions = { ...(m.reactions || {}) };
+          const users = reactions[data.emoji] || [];
+          if (users.includes(data.nickname)) {
+            reactions[data.emoji] = users.filter((u) => u !== data.nickname);
+            if (reactions[data.emoji].length === 0) delete reactions[data.emoji];
+          } else {
+            reactions[data.emoji] = [...users, data.nickname];
+          }
+          return { ...m, reactions };
+        }));
+      });
 
       channel.publish("user-join", { nickname: session.nickname });
       setJoined(true);
