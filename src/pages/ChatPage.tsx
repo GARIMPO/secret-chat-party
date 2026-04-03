@@ -421,6 +421,12 @@ export default function ChatPage() {
     channelRef.current.publish("message", msg);
   };
 
+  const handleMoodChange = (emoji: string) => {
+    setMyMood(emoji);
+    setUserMoods((prev) => ({ ...prev, [nickname]: emoji }));
+    channelRef.current?.publish("mood", { nickname, mood: emoji });
+  };
+
   const handleDeleteMessage = (messageId: string) => {
     channelRef.current?.publish("delete-message", { messageId });
   };
