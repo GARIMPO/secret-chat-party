@@ -48,6 +48,7 @@ interface ChatMessage {
   gif?: string;
   drawing?: string;
   system?: boolean;
+  mood?: string;
 }
 
 interface EmotionEvent {
