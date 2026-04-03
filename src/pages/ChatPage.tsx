@@ -199,7 +199,15 @@ export default function ChatPage() {
         updateMessages((prev) => [...prev, data]);
         if (data.sender !== nicknameRef.current) playBeep();
       });
-      channel.subscribe("youtube", (msg: Ably.Message) => setYtVideo(msg.data as YouTubeEvent));
+      channel.subscribe("youtube", (msg: Ably.Message) => {
+        const data = msg.data as YouTubeEvent;
+        setYtVideo(data);
+        if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
+      });
+      channel.subscribe("youtube-seek", (msg: Ably.Message) => {
+        const { time } = msg.data as { time: number };
+        setYtSeekTo(time);
+      });
       channel.subscribe("user-join", (msg: Ably.Message) => {
         const data = msg.data as { nickname: string };
         updateMessages((prev) => [...prev, {
