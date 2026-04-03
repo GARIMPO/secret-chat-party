@@ -358,6 +358,11 @@ export default function ChatPage() {
       updateMessages((prev) => [...prev, sysMsg]);
     });
 
+    channel.subscribe("mood", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; mood: string };
+      setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
+    });
+
     // Publish join event
     channel.publish("user-join", { nickname: nickname.trim() });
 
