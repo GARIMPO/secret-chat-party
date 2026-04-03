@@ -519,16 +519,16 @@ export default function ChatPage() {
           {!isSelf && (
             <p className="text-sm font-bold mb-0.5 text-primary flex items-center gap-1">
               {msg.sender}
-              {userMoods[msg.sender] && (
-                <span className="text-lg animate-mood-bounce inline-block">{userMoods[msg.sender]}</span>
+              {msg.mood && (
+                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
               )}
             </p>
           )}
           {isSelf && (
             <p className="text-sm font-bold mb-0.5 text-chat-self-foreground/80 flex items-center gap-1 justify-end">
               {nickname}
-              {myMood && (
-                <span className="text-lg animate-mood-bounce inline-block">{myMood}</span>
+              {msg.mood && (
+                <span className="text-lg animate-mood-bounce inline-block">{msg.mood}</span>
               )}
             </p>
           )}
