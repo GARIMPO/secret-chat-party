@@ -57,7 +57,6 @@ interface EmotionEvent {
 interface YouTubeEvent {
   videoId: string | null;
   isPlaying: boolean;
-  seekTime?: number;
 }
 
 const CHAT_FONT_SIZES: Record<string, string> = {
@@ -147,13 +146,7 @@ export default function ChatPage() {
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
-    try {
-      const saved = localStorage.getItem(`yt-state-${room}`);
-      return saved ? JSON.parse(saved) : { videoId: null, isPlaying: false };
-    } catch { return { videoId: null, isPlaying: false }; }
-  });
-  const [ytSeekTo, setYtSeekTo] = useState<number | null>(null);
+  const [ytVideo, setYtVideo] = useState<YouTubeEvent>({ videoId: null, isPlaying: false });
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activityInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -196,15 +189,7 @@ export default function ChatPage() {
         updateMessages((prev) => [...prev, data]);
         if (data.sender !== nicknameRef.current) playBeep();
       });
-      channel.subscribe("youtube", (msg: Ably.Message) => {
-        const data = msg.data as YouTubeEvent;
-        setYtVideo(data);
-        if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
-      });
-      channel.subscribe("youtube-seek", (msg: Ably.Message) => {
-        const { time } = msg.data as { time: number };
-        setYtSeekTo(time);
-      });
+      channel.subscribe("youtube", (msg: Ably.Message) => setYtVideo(msg.data as YouTubeEvent));
       channel.subscribe("user-join", (msg: Ably.Message) => {
         const data = msg.data as { nickname: string };
         updateMessages((prev) => [...prev, {
@@ -257,15 +242,6 @@ export default function ChatPage() {
       return next;
     });
   }, [room]);
-
-  const saveYtState = useCallback((evt: YouTubeEvent) => {
-    setYtVideo(evt);
-    if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
-  }, [room]);
-
-  const handleYouTubeSeek = useCallback((time: number) => {
-    channelRef.current?.publish("youtube-seek", { time });
-  }, []);
 
   if (!room) {
     return (
@@ -326,11 +302,6 @@ export default function ChatPage() {
     channel.subscribe("youtube", (msg: Ably.Message) => {
       const data = msg.data as YouTubeEvent;
       setYtVideo(data);
-      if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(data));
-    });
-    channel.subscribe("youtube-seek", (msg: Ably.Message) => {
-      const { time } = msg.data as { time: number };
-      setYtSeekTo(time);
     });
 
     channel.subscribe("user-join", (msg: Ably.Message) => {
@@ -440,20 +411,20 @@ export default function ChatPage() {
 
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
-    saveYtState(evt);
+    setYtVideo(evt);
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
   };
 
   const handleYouTubeToggle = () => {
     const evt: YouTubeEvent = { ...ytVideo, isPlaying: !ytVideo.isPlaying };
-    saveYtState(evt);
+    setYtVideo(evt);
     channelRef.current?.publish("youtube", evt);
   };
 
   const handleYouTubeClose = () => {
     const evt: YouTubeEvent = { videoId: null, isPlaying: false };
-    saveYtState(evt);
+    setYtVideo(evt);
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
   };
@@ -675,8 +646,6 @@ export default function ChatPage() {
           onSubmitLink={handleYouTubeSubmit}
           onTogglePlay={handleYouTubeToggle}
           onClose={handleYouTubeClose}
-          onSeek={handleYouTubeSeek}
-          seekTo={ytSeekTo}
         />
       )}
 
