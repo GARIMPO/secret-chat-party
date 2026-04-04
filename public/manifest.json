@@ -1,0 +1,17 @@
+{
+  "name": "SecureChat",
+  "short_name": "SecureChat",
+  "description": "Chat em tempo real com criptografia ponta-a-ponta",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#2e9e6e",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
