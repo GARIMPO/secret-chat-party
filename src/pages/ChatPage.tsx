@@ -193,13 +193,12 @@ export default function ChatPage() {
     // Presence for online users
     channel.presence.enter({ nickname: myNick });
     
-    const syncPresence = () => {
-      channel.presence.get((err, members) => {
-        if (!err && members) {
-          const names = members.map((m) => (m.data as { nickname: string })?.nickname || m.clientId);
-          setOnlineUsers([...new Set(names)]);
-        }
-      });
+    const syncPresence = async () => {
+      try {
+        const members = await channel.presence.get();
+        const names: string[] = members.map((m) => (m.data as { nickname: string })?.nickname || m.clientId);
+        setOnlineUsers([...new Set(names)]);
+      } catch {}
     };
     syncPresence();
     channel.presence.subscribe("enter", syncPresence);
