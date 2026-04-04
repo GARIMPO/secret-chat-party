@@ -806,7 +806,7 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3">
+      <form onSubmit={handleSend} className="border-t border-border bg-surface p-2 sm:p-3 relative">
         <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
           <ColorPicker value={textColor} onChange={setTextColor} />
           <Button
