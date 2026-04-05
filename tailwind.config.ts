@@ -60,6 +60,7 @@ export default {
       fontFamily: {
         sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        cursive: ['"Dancing Script"', 'cursive'],
       },
       borderRadius: {
         lg: "var(--radius)",
