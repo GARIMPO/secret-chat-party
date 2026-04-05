@@ -465,6 +465,20 @@ export default function ChatPage() {
     channelRef.current?.publish("mood", { nickname, mood: emoji });
   };
 
+  const handleSendLetter = (to: string, text: string) => {
+    if (!channelRef.current) return;
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("✉️ Carta Especial", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      mood: myMood || undefined,
+      letter: { to, text },
+    };
+    channelRef.current.publish("message", msg);
+    toast.success(`Carta enviada para ${to}!`);
+  };
+
   const handleDeleteMessage = (messageId: string) => {
     channelRef.current?.publish("delete-message", { messageId });
   };
