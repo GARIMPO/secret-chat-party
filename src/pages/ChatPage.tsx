@@ -57,6 +57,10 @@ interface ChatMessage {
   system?: boolean;
   mood?: string;
   reactions?: Record<string, string[]>;
+  letter?: {
+    to: string;
+    text: string;
+  };
 }
 
 interface EmotionEvent {
