@@ -111,6 +111,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "emotion-pop": "emotion-pop 2s ease-out forwards",
         "mood-bounce": "mood-bounce 2s ease-in-out infinite",
+        "letter-shake": "letter-shake 1.5s ease-in-out infinite",
       },
     },
   },
