@@ -575,26 +575,14 @@ export default function ChatPage() {
         );
       }
 
-      // Sender sees the letter inline
+      // Sender sees simple confirmation
       if (isSelf) {
         return (
           <div key={msg.id} className="flex justify-end group">
-            <div className="inline-block max-w-[85%] sm:max-w-[75%]">
-              <div className="rounded-2xl overflow-hidden shadow-lg relative">
-                <img src={parchmentBg} alt="" className="w-full h-auto block" />
-                <div className="absolute inset-0 flex flex-col justify-center px-6 py-5">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="text-lg">✉️</span>
-                    <span className="text-xs font-medium" style={{ color: "#5a3e1b" }}>
-                      Para: {msg.letter.to}
-                    </span>
-                  </div>
-                  <p className="font-cursive text-lg sm:text-xl leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#3b2810" }}>
-                    {msg.letter.text}
-                  </p>
-                  <p className="text-[10px] mt-2 text-right" style={{ color: "#8a6d3b" }}>{time}</p>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
+              <span className="text-lg">✉️</span>
+              <span>Carta enviada para <strong className="text-foreground">{msg.letter.to}</strong></span>
+              <span className="text-[10px] opacity-60">{time}</span>
             </div>
           </div>
         );
@@ -1025,17 +1013,17 @@ export default function ChatPage() {
             <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-sm sm:max-w-md">
               <div className="rounded-2xl overflow-hidden shadow-2xl relative">
                 <img src={parchmentBg} alt="" className="w-full h-auto block" />
-                <div className="absolute inset-0 flex flex-col justify-center px-8 py-6">
+                <div className="absolute inset-0 flex flex-col items-center pt-[30%] px-8">
                   <div className="flex items-center gap-1.5 mb-3">
                     <span className="text-xl">✉️</span>
                     <span className="text-sm font-medium" style={{ color: "#5a3e1b" }}>
                       De: {letterMsg.sender}
                     </span>
                   </div>
-                  <p className="font-cursive text-xl sm:text-2xl leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#3b2810" }}>
+                  <p className="font-cursive text-xl sm:text-2xl leading-relaxed break-words whitespace-pre-wrap text-center" style={{ color: "#3b2810" }}>
                     {letterMsg.letter.text}
                   </p>
-                  <p className="text-xs mt-3 text-right" style={{ color: "#8a6d3b" }}>
+                  <p className="text-xs mt-3" style={{ color: "#8a6d3b" }}>
                     {new Date(letterMsg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
