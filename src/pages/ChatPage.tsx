@@ -575,26 +575,14 @@ export default function ChatPage() {
         );
       }
 
-      // Sender sees the letter inline
+      // Sender sees simple confirmation
       if (isSelf) {
         return (
           <div key={msg.id} className="flex justify-end group">
-            <div className="inline-block max-w-[85%] sm:max-w-[75%]">
-              <div className="rounded-2xl overflow-hidden shadow-lg relative">
-                <img src={parchmentBg} alt="" className="w-full h-auto block" />
-                <div className="absolute inset-0 flex flex-col justify-center px-6 py-5">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="text-lg">✉️</span>
-                    <span className="text-xs font-medium" style={{ color: "#5a3e1b" }}>
-                      Para: {msg.letter.to}
-                    </span>
-                  </div>
-                  <p className="font-cursive text-lg sm:text-xl leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#3b2810" }}>
-                    {msg.letter.text}
-                  </p>
-                  <p className="text-[10px] mt-2 text-right" style={{ color: "#8a6d3b" }}>{time}</p>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
+              <span className="text-lg">✉️</span>
+              <span>Carta enviada para <strong className="text-foreground">{msg.letter.to}</strong></span>
+              <span className="text-[10px] opacity-60">{time}</span>
             </div>
           </div>
         );
