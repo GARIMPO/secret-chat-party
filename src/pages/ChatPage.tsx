@@ -166,6 +166,7 @@ export default function ChatPage() {
   const [textColor, setTextColor] = useState("");
   const [chatFontSize, setChatFontSize] = useState("large");
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showLetterComposer, setShowLetterComposer] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
