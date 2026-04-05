@@ -167,6 +167,7 @@ export default function ChatPage() {
   const [chatFontSize, setChatFontSize] = useState("large");
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showLetterComposer, setShowLetterComposer] = useState(false);
+  const [openLetterId, setOpenLetterId] = useState<string | null>(null);
   const [showDrawing, setShowDrawing] = useState(false);
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
