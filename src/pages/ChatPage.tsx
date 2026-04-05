@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -23,6 +23,8 @@ import ColorPicker from "@/components/chat/ColorPicker";
 import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
+import LetterComposer from "@/components/chat/LetterComposer";
+import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
   DialogContent,
