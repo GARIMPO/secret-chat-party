@@ -97,6 +97,14 @@ export default {
           "50%": { transform: "scale(1.3) rotate(5deg)" },
           "75%": { transform: "scale(1.15) rotate(-3deg)" },
         },
+        "letter-shake": {
+          "0%, 100%": { transform: "rotate(0deg) scale(1)" },
+          "10%": { transform: "rotate(-8deg) scale(1.1)" },
+          "20%": { transform: "rotate(8deg) scale(1.15)" },
+          "30%": { transform: "rotate(-6deg) scale(1.1)" },
+          "40%": { transform: "rotate(6deg) scale(1.05)" },
+          "50%": { transform: "rotate(0deg) scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
