@@ -60,6 +60,7 @@ export default {
       fontFamily: {
         sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        cursive: ['"Dancing Script"', 'cursive'],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -96,12 +97,21 @@ export default {
           "50%": { transform: "scale(1.3) rotate(5deg)" },
           "75%": { transform: "scale(1.15) rotate(-3deg)" },
         },
+        "letter-shake": {
+          "0%, 100%": { transform: "rotate(0deg) scale(1)" },
+          "10%": { transform: "rotate(-8deg) scale(1.1)" },
+          "20%": { transform: "rotate(8deg) scale(1.15)" },
+          "30%": { transform: "rotate(-6deg) scale(1.1)" },
+          "40%": { transform: "rotate(6deg) scale(1.05)" },
+          "50%": { transform: "rotate(0deg) scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "emotion-pop": "emotion-pop 2s ease-out forwards",
         "mood-bounce": "mood-bounce 2s ease-in-out infinite",
+        "letter-shake": "letter-shake 1.5s ease-in-out infinite",
       },
     },
   },

@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -23,6 +23,8 @@ import ColorPicker from "@/components/chat/ColorPicker";
 import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
+import LetterComposer from "@/components/chat/LetterComposer";
+import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +57,10 @@ interface ChatMessage {
   system?: boolean;
   mood?: string;
   reactions?: Record<string, string[]>;
+  letter?: {
+    to: string;
+    text: string;
+  };
 }
 
 interface EmotionEvent {
@@ -160,6 +166,7 @@ export default function ChatPage() {
   const [textColor, setTextColor] = useState("");
   const [chatFontSize, setChatFontSize] = useState("large");
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showLetterComposer, setShowLetterComposer] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
   const [showYouTubeInput, setShowYouTubeInput] = useState(false);
   const [emotion, setEmotion] = useState<EmotionEvent | null>(null);
@@ -458,6 +465,20 @@ export default function ChatPage() {
     channelRef.current?.publish("mood", { nickname, mood: emoji });
   };
 
+  const handleSendLetter = (to: string, text: string) => {
+    if (!channelRef.current) return;
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("✉️ Carta Especial", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      mood: myMood || undefined,
+      letter: { to, text },
+    };
+    channelRef.current.publish("message", msg);
+    toast.success(`Carta enviada para ${to}!`);
+  };
+
   const handleDeleteMessage = (messageId: string) => {
     channelRef.current?.publish("delete-message", { messageId });
   };
@@ -532,6 +553,61 @@ export default function ChatPage() {
             )}
             <span>{decrypted}</span>
             <span className="text-[10px] opacity-60">{time}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Letter messages: only visible to sender and recipient
+    if (msg.letter) {
+      const isRecipient = msg.letter.to === nickname;
+      const canSee = isSelf || isRecipient;
+
+      if (!canSee) {
+        // Others see an animated envelope notification
+        return (
+          <div key={msg.id} className="flex justify-center">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
+              <span className="animate-letter-shake inline-block text-lg">✉️</span>
+              <span>{msg.sender} enviou uma carta especial</span>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
+          <div className={`inline-block max-w-[85%] sm:max-w-[75%] ${isRecipient && !isSelf ? "animate-letter-shake" : ""}`}>
+            <div
+              className="rounded-2xl overflow-hidden shadow-lg relative"
+              style={{
+                backgroundImage: `url(${parchmentBg})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            >
+              <div className="px-5 py-4 min-w-[220px]">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-lg">✉️</span>
+                  <span className="text-xs font-medium" style={{ color: "#5a3e1b" }}>
+                    {isSelf ? `Para: ${msg.letter.to}` : `De: ${msg.sender}`}
+                  </span>
+                </div>
+                <p
+                  className="font-cursive text-lg sm:text-xl leading-relaxed break-words whitespace-pre-wrap"
+                  style={{
+                    color: "#3b2810",
+                    overflowWrap: "break-word",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {msg.letter.text}
+                </p>
+                <p className="text-[10px] mt-2 text-right" style={{ color: "#8a6d3b" }}>
+                  {time}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -891,6 +967,26 @@ export default function ChatPage() {
               <GifPicker
                 onSelect={handleSendGif}
                 onClose={() => setShowGifPicker(false)}
+              />
+            )}
+          </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLetterComposer(!showLetterComposer)}
+              title="Carta Especial"
+              className="h-8 w-8 p-0"
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </Button>
+            {showLetterComposer && (
+              <LetterComposer
+                onlineUsers={onlineUsers}
+                currentUser={nickname}
+                onSend={handleSendLetter}
+                onClose={() => setShowLetterComposer(false)}
               />
             )}
           </div>
