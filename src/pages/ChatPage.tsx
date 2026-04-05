@@ -1015,6 +1015,35 @@ export default function ChatPage() {
           </Button>
         </div>
       </form>
+
+      {/* Letter popup dialog */}
+      {openLetterId && (() => {
+        const letterMsg = messages.find(m => m.id === openLetterId && m.letter);
+        if (!letterMsg || !letterMsg.letter) return null;
+        return (
+          <Dialog open={true} onOpenChange={() => setOpenLetterId(null)}>
+            <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-sm sm:max-w-md">
+              <div className="rounded-2xl overflow-hidden shadow-2xl relative">
+                <img src={parchmentBg} alt="" className="w-full h-auto block" />
+                <div className="absolute inset-0 flex flex-col justify-center px-8 py-6">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <span className="text-xl">✉️</span>
+                    <span className="text-sm font-medium" style={{ color: "#5a3e1b" }}>
+                      De: {letterMsg.sender}
+                    </span>
+                  </div>
+                  <p className="font-cursive text-xl sm:text-2xl leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#3b2810" }}>
+                    {letterMsg.letter.text}
+                  </p>
+                  <p className="text-xs mt-3 text-right" style={{ color: "#8a6d3b" }}>
+                    {new Date(letterMsg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
