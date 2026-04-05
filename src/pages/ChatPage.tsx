@@ -564,51 +564,51 @@ export default function ChatPage() {
       const canSee = isSelf || isRecipient;
 
       if (!canSee) {
-        // Others see an animated envelope notification
         return (
           <div key={msg.id} className="flex justify-center">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-muted-foreground text-xs">
-              <span className="animate-letter-shake inline-block text-lg">✉️</span>
+              <span className="inline-block text-lg">✉️</span>
               <span>{msg.sender} enviou uma carta especial</span>
             </div>
           </div>
         );
       }
 
-      return (
-        <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
-          <div className={`inline-block max-w-[85%] sm:max-w-[75%] ${isRecipient && !isSelf ? "animate-letter-shake" : ""}`}>
-            <div
-              className="rounded-2xl overflow-hidden shadow-lg relative"
-              style={{
-                backgroundImage: `url(${parchmentBg})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div className="px-5 py-4 min-w-[220px]">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-lg">✉️</span>
-                  <span className="text-xs font-medium" style={{ color: "#5a3e1b" }}>
-                    {isSelf ? `Para: ${msg.letter.to}` : `De: ${msg.sender}`}
-                  </span>
+      // Sender sees the letter inline
+      if (isSelf) {
+        return (
+          <div key={msg.id} className="flex justify-end group">
+            <div className="inline-block max-w-[85%] sm:max-w-[75%]">
+              <div className="rounded-2xl overflow-hidden shadow-lg relative">
+                <img src={parchmentBg} alt="" className="w-full h-auto block" />
+                <div className="absolute inset-0 flex flex-col justify-center px-6 py-5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-lg">✉️</span>
+                    <span className="text-xs font-medium" style={{ color: "#5a3e1b" }}>
+                      Para: {msg.letter.to}
+                    </span>
+                  </div>
+                  <p className="font-cursive text-lg sm:text-xl leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#3b2810" }}>
+                    {msg.letter.text}
+                  </p>
+                  <p className="text-[10px] mt-2 text-right" style={{ color: "#8a6d3b" }}>{time}</p>
                 </div>
-                <p
-                  className="font-cursive text-lg sm:text-xl leading-relaxed break-words whitespace-pre-wrap"
-                  style={{
-                    color: "#3b2810",
-                    overflowWrap: "break-word",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {msg.letter.text}
-                </p>
-                <p className="text-[10px] mt-2 text-right" style={{ color: "#8a6d3b" }}>
-                  {time}
-                </p>
               </div>
             </div>
           </div>
+        );
+      }
+
+      // Recipient sees animated envelope icon — click to open popup
+      return (
+        <div key={msg.id} className="flex justify-start group">
+          <button
+            onClick={() => setOpenLetterId(openLetterId === msg.id ? null : msg.id)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/60 hover:bg-muted transition-colors cursor-pointer"
+          >
+            <span className="animate-letter-shake inline-block text-2xl">✉️</span>
+            <span className="text-xs text-muted-foreground">Carta de <strong className="text-foreground">{msg.sender}</strong> — toque para abrir</span>
+          </button>
         </div>
       );
     }
