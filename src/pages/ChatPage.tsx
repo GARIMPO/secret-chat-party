@@ -970,6 +970,26 @@ export default function ChatPage() {
               />
             )}
           </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLetterComposer(!showLetterComposer)}
+              title="Carta Especial"
+              className="h-8 w-8 p-0"
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </Button>
+            {showLetterComposer && (
+              <LetterComposer
+                onlineUsers={onlineUsers}
+                currentUser={nickname}
+                onSend={handleSendLetter}
+                onClose={() => setShowLetterComposer(false)}
+              />
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 relative items-end">
