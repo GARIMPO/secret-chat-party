@@ -104,6 +104,9 @@ export default function AdminPage() {
             <Input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <Button type="submit" className="w-full active:scale-[0.97]">Entrar</Button>
+          <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/")}>
+            ← Voltar para a página principal
+          </Button>
         </form>
       </div>
     );

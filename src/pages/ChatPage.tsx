@@ -66,6 +66,7 @@ interface ChatMessage {
 interface EmotionEvent {
   emoji: string;
   id: string;
+  sender?: string;
 }
 
 interface YouTubeEvent {
@@ -179,7 +180,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [textColor, setTextColor] = useState("");
-  const [chatFontSize, setChatFontSize] = useState("large");
+  const [chatFontSize, setChatFontSize] = useState("xlarge");
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showLetterComposer, setShowLetterComposer] = useState(false);
   const [openLetterId, setOpenLetterId] = useState<string | null>(null);
@@ -272,10 +273,10 @@ export default function ChatPage() {
       setYtSeekTo(time);
     });
     channel.subscribe("user-join", (msg: Ably.Message) => {
-      const data = msg.data as { nickname: string };
+      const data = msg.data as { nickname: string; mood?: string };
       updateMessages((prev) => [...prev, {
         id: crypto.randomUUID(), sender: "sistema",
-        encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+        encrypted: encryptMessage(`${data.mood ? data.mood + " " : ""}${data.nickname} entrou na sala`, ROOM_PASSWORD),
         timestamp: Date.now(), system: true,
       }]);
     });
@@ -432,7 +433,7 @@ export default function ChatPage() {
     subscribeAll(channel);
     setupPresenceAndTyping(channel, nickname.trim());
 
-    channel.publish("user-join", { nickname: nickname.trim() });
+    channel.publish("user-join", { nickname: nickname.trim(), mood: myMood });
 
     if (myMood) {
       channel.publish("mood", { nickname: nickname.trim(), mood: myMood });
@@ -505,7 +506,7 @@ export default function ChatPage() {
 
   const handleSendEmotion = (emoji: string) => {
     if (!channelRef.current) return;
-    channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID() });
+    channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID(), sender: nickname });
   };
 
   const handleSendDrawing = (dataUrl: string) => {
@@ -868,6 +869,21 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Letter Composer Dialog */}
+      <Dialog open={showLetterComposer} onOpenChange={setShowLetterComposer}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <LetterComposer
+            onlineUsers={onlineUsers}
+            currentUser={nickname}
+            onSend={(to, text) => {
+              handleSendLetter(to, text);
+              setShowLetterComposer(false);
+            }}
+            onClose={() => setShowLetterComposer(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       <header className="flex items-center gap-2 sm:gap-3 border-b border-border bg-surface px-3 sm:px-4 py-2 sm:py-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="h-8 w-8 shrink-0">
           <ArrowLeft className="h-4 w-4" />
@@ -1021,8 +1037,7 @@ export default function ChatPage() {
               />
             )}
           </div>
-          <div className="relative">
-            <Button
+          <Button
               type="button"
               variant="outline"
               size="sm"
@@ -1032,15 +1047,6 @@ export default function ChatPage() {
             >
               <Mail className="h-3.5 w-3.5" />
             </Button>
-            {showLetterComposer && (
-              <LetterComposer
-                onlineUsers={onlineUsers}
-                currentUser={nickname}
-                onSend={handleSendLetter}
-                onClose={() => setShowLetterComposer(false)}
-              />
-            )}
-          </div>
           <div className="relative">
             <Button
               type="button"
@@ -1061,14 +1067,9 @@ export default function ChatPage() {
                     <button
                       key={lang.code}
                       type="button"
-                      onClick={() => {
+                    onClick={() => {
                         setTranslateLang(lang.code);
                         setShowTranslateMenu(false);
-                        if (lang.code) {
-                          toast.success(`Traduzindo para ${lang.label}`);
-                        } else {
-                          toast.info("Tradução desativada");
-                        }
                       }}
                       className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
                         translateLang === lang.code

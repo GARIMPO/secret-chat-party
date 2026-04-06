@@ -30,7 +30,7 @@ export default function LetterComposer({ onlineUsers, currentUser, onSend, onClo
   };
 
   return (
-    <div className="absolute bottom-full mb-2 left-0 w-72 sm:w-80 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
+    <div className="w-full bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
       <div className="flex items-center justify-between p-2 border-b border-border">
         <span className="text-xs font-semibold text-foreground">✉️ Carta Especial</span>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-sm px-1">✕</button>
