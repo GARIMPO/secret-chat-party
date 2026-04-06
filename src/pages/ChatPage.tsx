@@ -382,6 +382,10 @@ export default function ChatPage() {
       toast.error("Senha da sala incorreta!");
       return;
     }
+    if (!myMood) {
+      toast.error("Selecione seu humor antes de entrar!");
+      return;
+    }
 
     const stored = loadMessages(room);
     setMessages(stored);
