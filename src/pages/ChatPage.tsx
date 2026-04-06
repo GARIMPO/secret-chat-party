@@ -179,7 +179,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [textColor, setTextColor] = useState("");
-  const [chatFontSize, setChatFontSize] = useState("large");
+  const [chatFontSize, setChatFontSize] = useState("xlarge");
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showLetterComposer, setShowLetterComposer] = useState(false);
   const [openLetterId, setOpenLetterId] = useState<string | null>(null);
