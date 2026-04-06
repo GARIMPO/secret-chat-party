@@ -783,16 +783,16 @@ export default function ChatPage() {
             />
           </div>
 
-          {/* Mood selection on entry */}
+          {/* Mood selection on entry — REQUIRED */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-foreground">Selecione seu humor</p>
-            <div className="flex gap-2 justify-center flex-wrap">
+            <p className="text-sm font-medium text-foreground">Selecione seu humor <span className="text-destructive">*</span></p>
+            <div className="grid grid-cols-3 gap-2 justify-items-center">
               {MOODS_FOR_ENTRY.map((m) => (
                 <button
                   key={m.emoji}
                   type="button"
                   onClick={() => setMyMood(m.emoji)}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-full ${
                     myMood === m.emoji
                       ? "bg-primary/15 ring-2 ring-primary scale-110"
                       : "bg-muted/50 hover:bg-muted"
