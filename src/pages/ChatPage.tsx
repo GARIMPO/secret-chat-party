@@ -1022,8 +1022,7 @@ export default function ChatPage() {
               />
             )}
           </div>
-          <div className="relative">
-            <Button
+          <Button
               type="button"
               variant="outline"
               size="sm"
@@ -1033,15 +1032,6 @@ export default function ChatPage() {
             >
               <Mail className="h-3.5 w-3.5" />
             </Button>
-            {showLetterComposer && (
-              <LetterComposer
-                onlineUsers={onlineUsers}
-                currentUser={nickname}
-                onSend={handleSendLetter}
-                onClose={() => setShowLetterComposer(false)}
-              />
-            )}
-          </div>
           <div className="relative">
             <Button
               type="button"
