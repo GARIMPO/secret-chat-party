@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -84,6 +84,21 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 
 const ROOM_PASSWORD = "entrar2025";
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
+
+const LANGUAGES = [
+  { code: "", label: "Sem tradução" },
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "ja", label: "日本語" },
+  { code: "ko", label: "한국어" },
+  { code: "zh", label: "中文" },
+  { code: "ru", label: "Русский" },
+  { code: "ar", label: "العربية" },
+  { code: "pt", label: "Português" },
+];
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
@@ -174,6 +189,9 @@ export default function ChatPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [myMood, setMyMood] = useState<string | null>(null);
   const [userMoods, setUserMoods] = useState<Record<string, string>>({});
+  const [translateLang, setTranslateLang] = useState("");
+  const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
+  const [showTranslateMenu, setShowTranslateMenu] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
@@ -344,6 +362,39 @@ export default function ChatPage() {
     });
   }, [room]);
 
+  // Google Translate helper
+  const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
+    if (!targetLang) return text;
+    try {
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
+      );
+      const data = await res.json();
+      return data[0]?.map((s: any) => s[0]).join("") || text;
+    } catch {
+      return text;
+    }
+  }, []);
+
+  // Translate all messages when language changes
+  useEffect(() => {
+    if (!translateLang) {
+      setTranslatedTexts({});
+      return;
+    }
+    const translateAll = async () => {
+      const newTranslations: Record<string, string> = {};
+      for (const msg of messages) {
+        if (msg.system || msg.letter || msg.gif || msg.drawing) continue;
+        const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
+        if (decrypted === msg.encrypted) continue;
+        newTranslations[msg.id] = await translateText(decrypted, translateLang);
+      }
+      setTranslatedTexts(newTranslations);
+    };
+    translateAll();
+  }, [translateLang, messages, translateText]);
+
   if (!room) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -362,6 +413,10 @@ export default function ChatPage() {
     if (!nickname.trim()) return;
     if (roomPassword !== ROOM_PASSWORD) {
       toast.error("Senha da sala incorreta!");
+      return;
+    }
+    if (!myMood) {
+      toast.error("Selecione seu humor antes de entrar!");
       return;
     }
 
@@ -406,7 +461,7 @@ export default function ChatPage() {
     }, 2000);
   };
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !channelRef.current) return;
 
@@ -415,7 +470,13 @@ export default function ChatPage() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     channelRef.current.publish("typing-stop", { nickname });
 
-    const encrypted = encryptMessage(input.trim(), ROOM_PASSWORD);
+    // Auto-translate outgoing message if language is set
+    let textToSend = input.trim();
+    if (translateLang) {
+      textToSend = await translateText(textToSend, translateLang);
+    }
+
+    const encrypted = encryptMessage(textToSend, ROOM_PASSWORD);
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: nickname,
@@ -658,9 +719,10 @@ export default function ChatPage() {
                 }}
               >
                 {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-                {linkify(decrypted)}
+                {linkify(translateLang && translatedTexts[msg.id] ? translatedTexts[msg.id] : decrypted)}
               </p>
             )}
+
 
             <div className="flex items-center justify-between mt-1">
               <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
@@ -761,16 +823,16 @@ export default function ChatPage() {
             />
           </div>
 
-          {/* Mood selection on entry */}
+          {/* Mood selection on entry — REQUIRED */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-foreground">Selecione seu humor</p>
-            <div className="flex gap-2 justify-center flex-wrap">
+            <p className="text-sm font-medium text-foreground">Selecione seu humor <span className="text-destructive">*</span></p>
+            <div className="grid grid-cols-3 gap-2 justify-items-center">
               {MOODS_FOR_ENTRY.map((m) => (
                 <button
                   key={m.emoji}
                   type="button"
                   onClick={() => setMyMood(m.emoji)}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-full ${
                     myMood === m.emoji
                       ? "bg-primary/15 ring-2 ring-primary scale-110"
                       : "bg-muted/50 hover:bg-muted"
@@ -977,6 +1039,48 @@ export default function ChatPage() {
                 onSend={handleSendLetter}
                 onClose={() => setShowLetterComposer(false)}
               />
+            )}
+          </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant={translateLang ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowTranslateMenu(!showTranslateMenu)}
+              title="Traduzir"
+              className="h-8 gap-1 px-2"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold leading-none">Traduzir</span>
+            </Button>
+            {showTranslateMenu && (
+              <div className="absolute bottom-full mb-1 left-0 w-48 bg-popover border border-border rounded-lg shadow-lg p-2 z-50">
+                <p className="text-[10px] font-medium text-muted-foreground px-1 mb-1">Idioma do chat</p>
+                <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => {
+                        setTranslateLang(lang.code);
+                        setShowTranslateMenu(false);
+                        if (lang.code) {
+                          toast.success(`Traduzindo para ${lang.label}`);
+                        } else {
+                          toast.info("Tradução desativada");
+                        }
+                      }}
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                        translateLang === lang.code
+                          ? "bg-primary/15 text-foreground font-medium"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
