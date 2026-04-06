@@ -719,9 +719,10 @@ export default function ChatPage() {
                 }}
               >
                 {isEncrypted && <Lock className="inline h-3 w-3 mr-1 -mt-0.5" />}
-                {linkify(decrypted)}
+                {linkify(translateLang && translatedTexts[msg.id] ? translatedTexts[msg.id] : decrypted)}
               </p>
             )}
+
 
             <div className="flex items-center justify-between mt-1">
               <p className={`text-[10px] ${isSelf ? "text-chat-self-foreground/60" : "text-muted-foreground"}`}>
