@@ -273,10 +273,10 @@ export default function ChatPage() {
       setYtSeekTo(time);
     });
     channel.subscribe("user-join", (msg: Ably.Message) => {
-      const data = msg.data as { nickname: string };
+      const data = msg.data as { nickname: string; mood?: string };
       updateMessages((prev) => [...prev, {
         id: crypto.randomUUID(), sender: "sistema",
-        encrypted: encryptMessage(`${data.nickname} entrou na sala`, ROOM_PASSWORD),
+        encrypted: encryptMessage(`${data.mood ? data.mood + " " : ""}${data.nickname} entrou na sala`, ROOM_PASSWORD),
         timestamp: Date.now(), system: true,
       }]);
     });
