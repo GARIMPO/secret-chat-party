@@ -420,6 +420,7 @@ export default function ChatPage() {
       return;
     }
 
+  const handleTyping = () => {
     if (!channelRef.current) return;
     if (!isTypingRef.current) {
       isTypingRef.current = true;
