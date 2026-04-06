@@ -415,7 +415,39 @@ export default function ChatPage() {
     setJoined(true);
   };
 
-  const handleTyping = () => {
+  // Google Translate helper
+  const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
+    if (!targetLang) return text;
+    try {
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
+      );
+      const data = await res.json();
+      return data[0]?.map((s: any) => s[0]).join("") || text;
+    } catch {
+      return text;
+    }
+  }, []);
+
+  // Translate all messages when language changes
+  useEffect(() => {
+    if (!translateLang) {
+      setTranslatedTexts({});
+      return;
+    }
+    const translateAll = async () => {
+      const newTranslations: Record<string, string> = {};
+      for (const msg of messages) {
+        if (msg.system || msg.letter || msg.gif || msg.drawing) continue;
+        const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
+        if (decrypted === msg.encrypted) continue;
+        newTranslations[msg.id] = await translateText(decrypted, translateLang);
+      }
+      setTranslatedTexts(newTranslations);
+    };
+    translateAll();
+  }, [translateLang, messages, translateText]);
+
     if (!channelRef.current) return;
     if (!isTypingRef.current) {
       isTypingRef.current = true;
