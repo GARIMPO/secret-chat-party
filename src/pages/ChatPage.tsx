@@ -1041,6 +1041,48 @@ export default function ChatPage() {
               />
             )}
           </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant={translateLang ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowTranslateMenu(!showTranslateMenu)}
+              title="Traduzir"
+              className="h-8 gap-1 px-2"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold leading-none">Traduzir</span>
+            </Button>
+            {showTranslateMenu && (
+              <div className="absolute bottom-full mb-1 left-0 w-48 bg-popover border border-border rounded-lg shadow-lg p-2 z-50">
+                <p className="text-[10px] font-medium text-muted-foreground px-1 mb-1">Idioma do chat</p>
+                <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => {
+                        setTranslateLang(lang.code);
+                        setShowTranslateMenu(false);
+                        if (lang.code) {
+                          toast.success(`Traduzindo para ${lang.label}`);
+                        } else {
+                          toast.info("Tradução desativada");
+                        }
+                      }}
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                        translateLang === lang.code
+                          ? "bg-primary/15 text-foreground font-medium"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 relative items-end">
