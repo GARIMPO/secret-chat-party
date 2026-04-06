@@ -85,6 +85,21 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 const ROOM_PASSWORD = "entrar2025";
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
 
+const LANGUAGES = [
+  { code: "", label: "Sem tradução" },
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+  { code: "ja", label: "日本語" },
+  { code: "ko", label: "한국어" },
+  { code: "zh", label: "中文" },
+  { code: "ru", label: "Русский" },
+  { code: "ar", label: "العربية" },
+  { code: "pt", label: "Português" },
+];
+
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
 const MOODS_FOR_ENTRY = [
