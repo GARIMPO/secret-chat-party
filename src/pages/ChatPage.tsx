@@ -189,6 +189,9 @@ export default function ChatPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [myMood, setMyMood] = useState<string | null>(null);
   const [userMoods, setUserMoods] = useState<Record<string, string>>({});
+  const [translateLang, setTranslateLang] = useState("");
+  const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
+  const [showTranslateMenu, setShowTranslateMenu] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
