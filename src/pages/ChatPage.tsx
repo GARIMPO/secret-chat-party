@@ -869,6 +869,21 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Letter Composer Dialog */}
+      <Dialog open={showLetterComposer} onOpenChange={setShowLetterComposer}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <LetterComposer
+            onlineUsers={onlineUsers}
+            currentUser={nickname}
+            onSend={(to, text) => {
+              handleSendLetter(to, text);
+              setShowLetterComposer(false);
+            }}
+            onClose={() => setShowLetterComposer(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       <header className="flex items-center gap-2 sm:gap-3 border-b border-border bg-surface px-3 sm:px-4 py-2 sm:py-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="h-8 w-8 shrink-0">
           <ArrowLeft className="h-4 w-4" />
