@@ -433,7 +433,7 @@ export default function ChatPage() {
     subscribeAll(channel);
     setupPresenceAndTyping(channel, nickname.trim());
 
-    channel.publish("user-join", { nickname: nickname.trim() });
+    channel.publish("user-join", { nickname: nickname.trim(), mood: myMood });
 
     if (myMood) {
       channel.publish("mood", { nickname: nickname.trim(), mood: myMood });
