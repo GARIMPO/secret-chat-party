@@ -506,7 +506,7 @@ export default function ChatPage() {
 
   const handleSendEmotion = (emoji: string) => {
     if (!channelRef.current) return;
-    channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID() });
+    channelRef.current.publish("emotion", { emoji, id: crypto.randomUUID(), sender: nickname });
   };
 
   const handleSendDrawing = (dataUrl: string) => {
