@@ -420,6 +420,34 @@ export default function ChatPage() {
       return;
     }
 
+    const stored = loadMessages(room);
+    setMessages(stored);
+    saveSession(room, nickname.trim());
+    nicknameRef.current = nickname.trim();
+
+    const client = getAblyClient(nickname.trim());
+    const channel = client.channels.get(`chat-${room}`);
+    channelRef.current = channel;
+
+    subscribeAll(channel);
+    setupPresenceAndTyping(channel, nickname.trim());
+
+    channel.publish("user-join", { nickname: nickname.trim() });
+
+    if (myMood) {
+      channel.publish("mood", { nickname: nickname.trim(), mood: myMood });
+      setUserMoods((prev) => ({ ...prev, [nickname.trim()]: myMood }));
+    }
+
+    const handleUnload = () => {
+      channel.presence.leave();
+      channel.publish("user-leave", { nickname: nicknameRef.current });
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
+    setJoined(true);
+  };
+
   const handleTyping = () => {
     if (!channelRef.current) return;
     if (!isTypingRef.current) {
