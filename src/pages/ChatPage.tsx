@@ -362,59 +362,6 @@ export default function ChatPage() {
     });
   }, [room]);
 
-  if (!room) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="text-center space-y-4">
-          <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
-          <p className="text-foreground font-medium">Nenhuma sala especificada.</p>
-          <p className="text-sm text-muted-foreground">Acesse via link com ?room=nome</p>
-          <Button variant="outline" onClick={() => navigate("/")}>Voltar</Button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleJoin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nickname.trim()) return;
-    if (roomPassword !== ROOM_PASSWORD) {
-      toast.error("Senha da sala incorreta!");
-      return;
-    }
-    if (!myMood) {
-      toast.error("Selecione seu humor antes de entrar!");
-      return;
-    }
-
-    const stored = loadMessages(room);
-    setMessages(stored);
-    saveSession(room, nickname.trim());
-    nicknameRef.current = nickname.trim();
-
-    const client = getAblyClient(nickname.trim());
-    const channel = client.channels.get(`chat-${room}`);
-    channelRef.current = channel;
-
-    subscribeAll(channel);
-    setupPresenceAndTyping(channel, nickname.trim());
-
-    channel.publish("user-join", { nickname: nickname.trim() });
-
-    if (myMood) {
-      channel.publish("mood", { nickname: nickname.trim(), mood: myMood });
-      setUserMoods((prev) => ({ ...prev, [nickname.trim()]: myMood }));
-    }
-
-    const handleUnload = () => {
-      channel.presence.leave();
-      channel.publish("user-leave", { nickname: nicknameRef.current });
-    };
-    window.addEventListener("beforeunload", handleUnload);
-
-    setJoined(true);
-  };
-
   // Google Translate helper
   const translateText = useCallback(async (text: string, targetLang: string): Promise<string> => {
     if (!targetLang) return text;
@@ -447,6 +394,31 @@ export default function ChatPage() {
     };
     translateAll();
   }, [translateLang, messages, translateText]);
+
+  if (!room) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4">
+          <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
+          <p className="text-foreground font-medium">Nenhuma sala especificada.</p>
+          <p className="text-sm text-muted-foreground">Acesse via link com ?room=nome</p>
+          <Button variant="outline" onClick={() => navigate("/")}>Voltar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nickname.trim()) return;
+    if (roomPassword !== ROOM_PASSWORD) {
+      toast.error("Senha da sala incorreta!");
+      return;
+    }
+    if (!myMood) {
+      toast.error("Selecione seu humor antes de entrar!");
+      return;
+    }
 
     if (!channelRef.current) return;
     if (!isTypingRef.current) {
