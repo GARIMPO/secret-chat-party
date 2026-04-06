@@ -1062,14 +1062,9 @@ export default function ChatPage() {
                     <button
                       key={lang.code}
                       type="button"
-                      onClick={() => {
+                    onClick={() => {
                         setTranslateLang(lang.code);
                         setShowTranslateMenu(false);
-                        if (lang.code) {
-                          toast.success(`Traduzindo para ${lang.label}`);
-                        } else {
-                          toast.info("Tradução desativada");
-                        }
                       }}
                       className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
                         translateLang === lang.code
