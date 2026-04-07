@@ -84,7 +84,7 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 };
 
 const ROOM_PASSWORD = "entrar2025";
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 
 const LANGUAGES = [
   { code: "", label: "Sem tradução" },
