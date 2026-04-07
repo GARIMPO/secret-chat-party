@@ -172,7 +172,7 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const room = searchParams.get("room");
-  const isAdmin = searchParams.get("admin") === "true";
+  const isAdminParam = searchParams.get("admin") === "true";
 
   const [nickname, setNickname] = useState("");
   const [roomPassword, setRoomPassword] = useState("");
