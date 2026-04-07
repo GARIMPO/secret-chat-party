@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -84,7 +84,7 @@ const CHAT_FONT_SIZES: Record<string, string> = {
 };
 
 const ROOM_PASSWORD = "entrar2025";
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000;
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 
 const LANGUAGES = [
   { code: "", label: "Sem tradução" },
@@ -172,7 +172,7 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const room = searchParams.get("room");
-  const isAdmin = searchParams.get("admin") === "true";
+  const isAdminParam = searchParams.get("admin") === "true";
 
   const [nickname, setNickname] = useState("");
   const [roomPassword, setRoomPassword] = useState("");
@@ -193,6 +193,9 @@ export default function ChatPage() {
   const [translateLang, setTranslateLang] = useState("");
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [externalUrl, setExternalUrl] = useState("");
+  const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
@@ -291,6 +294,26 @@ export default function ChatPage() {
     channel.subscribe("mood", (msg: Ably.Message) => {
       const data = msg.data as { nickname: string; mood: string };
       setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
+    });
+    channel.subscribe("kick-user", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      if (data.nickname === nicknameRef.current) {
+        channel.presence.leave();
+        channel.detach();
+        channelRef.current = null;
+        setJoined(false);
+        setNickname("");
+        setRoomPassword("");
+        localStorage.removeItem(`chat-session-${room}`);
+        toast.error("Você foi expulso da sala pelo administrador.");
+      }
+    });
+    channel.subscribe("promote-admin", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      setRoomAdmins((prev) => prev.includes(data.nickname) ? prev : [...prev, data.nickname]);
+      if (data.nickname === nicknameRef.current) {
+        toast.success("Você foi promovido a administrador!");
+      }
     });
     channel.subscribe("reaction", (msg: Ably.Message) => {
       const data = msg.data as { messageId: string; emoji: string; nickname: string };
@@ -569,6 +592,36 @@ export default function ChatPage() {
       setRoomPassword("");
       toast.info("Você saiu da sala");
     }
+  };
+
+  const isAdmin = isAdminParam || roomAdmins.includes(nickname);
+
+  const handleKickUser = (targetUser: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("kick-user", { nickname: targetUser });
+    toast.success(`${targetUser} foi expulso da sala`);
+  };
+
+  const handlePromoteAdmin = (targetUser: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("promote-admin", { nickname: targetUser });
+    toast.success(`${targetUser} foi promovido a admin`);
+  };
+
+  const handleSendExternalUrl = () => {
+    if (!externalUrl.trim() || !channelRef.current) return;
+    const url = externalUrl.trim();
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("📎 Imagem externa", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      gif: url,
+      mood: myMood || undefined,
+    };
+    channelRef.current.publish("message", msg);
+    setExternalUrl("");
+    setShowUrlInput(false);
   };
 
   const handleYouTubeSubmit = (videoId: string) => {
@@ -909,9 +962,40 @@ export default function ChatPage() {
                 {onlineUsers.map((user) => (
                   <div key={user} className="flex items-center gap-2 text-sm">
                     <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                    <span className="truncate text-foreground">{user}</span>
+                    <span className="truncate text-foreground flex-1">{user}</span>
                     {userMoods[user] && <span className="text-base">{userMoods[user]}</span>}
                     {user === nickname && <span className="text-[10px] text-muted-foreground">(você)</span>}
+                    {isAdmin && user !== nickname && (
+                      <div className="flex items-center gap-0.5 ml-auto">
+                        <button
+                          onClick={() => handlePromoteAdmin(user)}
+                          title="Promover a admin"
+                          className="p-0.5 rounded hover:bg-muted transition-colors"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              title="Expulsar"
+                              className="p-0.5 rounded hover:bg-muted transition-colors"
+                            >
+                              <UserX className="h-3.5 w-3.5 text-destructive" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Expulsar {user}?</AlertDialogTitle>
+                              <AlertDialogDescription>O usuário será removido da sala imediatamente.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleKickUser(user)}>Expulsar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1035,6 +1119,35 @@ export default function ChatPage() {
                 onSelect={handleSendGif}
                 onClose={() => setShowGifPicker(false)}
               />
+            )}
+          </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+              title="Enviar imagem por URL"
+              className="h-8 w-8 p-0"
+            >
+              <Image className="h-3.5 w-3.5" />
+            </Button>
+            {showUrlInput && (
+              <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg p-2 z-50">
+                <p className="text-[10px] font-medium text-muted-foreground mb-1">URL da imagem ou GIF</p>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="https://..."
+                    value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSendExternalUrl(); } }}
+                  />
+                  <Button type="button" size="sm" className="h-7 px-2" onClick={handleSendExternalUrl} disabled={!externalUrl.trim()}>
+                    <Send className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
           <Button
