@@ -962,9 +962,40 @@ export default function ChatPage() {
                 {onlineUsers.map((user) => (
                   <div key={user} className="flex items-center gap-2 text-sm">
                     <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                    <span className="truncate text-foreground">{user}</span>
+                    <span className="truncate text-foreground flex-1">{user}</span>
                     {userMoods[user] && <span className="text-base">{userMoods[user]}</span>}
                     {user === nickname && <span className="text-[10px] text-muted-foreground">(você)</span>}
+                    {isAdmin && user !== nickname && (
+                      <div className="flex items-center gap-0.5 ml-auto">
+                        <button
+                          onClick={() => handlePromoteAdmin(user)}
+                          title="Promover a admin"
+                          className="p-0.5 rounded hover:bg-muted transition-colors"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              title="Expulsar"
+                              className="p-0.5 rounded hover:bg-muted transition-colors"
+                            >
+                              <UserX className="h-3.5 w-3.5 text-destructive" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Expulsar {user}?</AlertDialogTitle>
+                              <AlertDialogDescription>O usuário será removido da sala imediatamente.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleKickUser(user)}>Expulsar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
