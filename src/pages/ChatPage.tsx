@@ -24,6 +24,7 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import DiceGame from "@/components/chat/DiceGame";
 import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
