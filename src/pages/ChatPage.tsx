@@ -973,7 +973,21 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dice Game Dialog */}
+      {/* Letter Composer Dialog */}
+      <Dialog open={showLetterComposer} onOpenChange={setShowLetterComposer}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <LetterComposer
+            onlineUsers={onlineUsers}
+            currentUser={nickname}
+            onSend={(to, text) => {
+              handleSendLetter(to, text);
+              setShowLetterComposer(false);
+            }}
+            onClose={() => setShowLetterComposer(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showDiceGame} onOpenChange={setShowDiceGame}>
         <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
           <DiceGame
