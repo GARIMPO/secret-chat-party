@@ -634,6 +634,11 @@ export default function ChatPage() {
     setShowUrlInput(false);
   };
 
+  const handleDiceRoll = (result: number) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("dice-roll", { nickname, result });
+  };
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
     setYtVideo(evt);
