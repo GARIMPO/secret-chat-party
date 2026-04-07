@@ -332,6 +332,14 @@ export default function ChatPage() {
         return { ...m, reactions };
       }));
     });
+    channel.subscribe("dice-roll", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; result: number };
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(`🎲 ${data.nickname} rolou o dado e tirou ${data.result}!`, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
+    });
   }, [room]);
 
   // Auto-rejoin from saved session
