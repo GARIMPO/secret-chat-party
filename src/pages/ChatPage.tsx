@@ -295,6 +295,26 @@ export default function ChatPage() {
       const data = msg.data as { nickname: string; mood: string };
       setUserMoods((prev) => ({ ...prev, [data.nickname]: data.mood }));
     });
+    channel.subscribe("kick-user", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      if (data.nickname === nicknameRef.current) {
+        channel.presence.leave();
+        channel.detach();
+        channelRef.current = null;
+        setJoined(false);
+        setNickname("");
+        setRoomPassword("");
+        localStorage.removeItem(`chat-session-${room}`);
+        toast.error("Você foi expulso da sala pelo administrador.");
+      }
+    });
+    channel.subscribe("promote-admin", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string };
+      setRoomAdmins((prev) => prev.includes(data.nickname) ? prev : [...prev, data.nickname]);
+      if (data.nickname === nicknameRef.current) {
+        toast.success("Você foi promovido a administrador!");
+      }
+    });
     channel.subscribe("reaction", (msg: Ably.Message) => {
       const data = msg.data as { messageId: string; emoji: string; nickname: string };
       updateMessages((prev) => prev.map((m) => {
