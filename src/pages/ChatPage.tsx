@@ -193,6 +193,9 @@ export default function ChatPage() {
   const [translateLang, setTranslateLang] = useState("");
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [externalUrl, setExternalUrl] = useState("");
+  const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
