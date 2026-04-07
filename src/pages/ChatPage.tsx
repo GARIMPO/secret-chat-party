@@ -1121,6 +1121,35 @@ export default function ChatPage() {
               />
             )}
           </div>
+          <div className="relative">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+              title="Enviar imagem por URL"
+              className="h-8 w-8 p-0"
+            >
+              <Image className="h-3.5 w-3.5" />
+            </Button>
+            {showUrlInput && (
+              <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg p-2 z-50">
+                <p className="text-[10px] font-medium text-muted-foreground mb-1">URL da imagem ou GIF</p>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="https://..."
+                    value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSendExternalUrl(); } }}
+                  />
+                  <Button type="button" size="sm" className="h-7 px-2" onClick={handleSendExternalUrl} disabled={!externalUrl.trim()}>
+                    <Send className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           <Button
               type="button"
               variant="outline"
