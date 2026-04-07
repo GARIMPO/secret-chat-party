@@ -937,17 +937,48 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Letter Composer Dialog */}
-      <Dialog open={showLetterComposer} onOpenChange={setShowLetterComposer}>
+      {/* GIF Picker Dialog */}
+      <Dialog open={showGifPicker} onOpenChange={setShowGifPicker}>
         <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
-          <LetterComposer
-            onlineUsers={onlineUsers}
-            currentUser={nickname}
-            onSend={(to, text) => {
-              handleSendLetter(to, text);
-              setShowLetterComposer(false);
-            }}
-            onClose={() => setShowLetterComposer(false)}
+          <GifPicker
+            onSelect={(url) => { handleSendGif(url); setShowGifPicker(false); }}
+            onClose={() => setShowGifPicker(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* URL Input Dialog */}
+      <Dialog open={showUrlInput} onOpenChange={setShowUrlInput}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <div className="w-full bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between p-2 border-b border-border">
+              <span className="text-xs font-semibold text-foreground">📎 URL da Imagem ou GIF</span>
+              <button onClick={() => setShowUrlInput(false)} className="text-muted-foreground hover:text-foreground text-sm px-1">✕</button>
+            </div>
+            <div className="p-3 space-y-3">
+              <Input
+                placeholder="https://..."
+                value={externalUrl}
+                onChange={(e) => setExternalUrl(e.target.value)}
+                className="h-9 text-sm"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSendExternalUrl(); } }}
+              />
+              <Button type="button" className="w-full gap-2" onClick={handleSendExternalUrl} disabled={!externalUrl.trim()}>
+                <Send className="h-3.5 w-3.5" />
+                Enviar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dice Game Dialog */}
+      <Dialog open={showDiceGame} onOpenChange={setShowDiceGame}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <DiceGame
+            onRoll={handleDiceRoll}
+            onClose={() => setShowDiceGame(false)}
           />
         </DialogContent>
       </Dialog>
