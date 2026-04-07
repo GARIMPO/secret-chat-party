@@ -594,6 +594,36 @@ export default function ChatPage() {
     }
   };
 
+  const isAdmin = isAdminParam || roomAdmins.includes(nickname);
+
+  const handleKickUser = (targetUser: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("kick-user", { nickname: targetUser });
+    toast.success(`${targetUser} foi expulso da sala`);
+  };
+
+  const handlePromoteAdmin = (targetUser: string) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("promote-admin", { nickname: targetUser });
+    toast.success(`${targetUser} foi promovido a admin`);
+  };
+
+  const handleSendExternalUrl = () => {
+    if (!externalUrl.trim() || !channelRef.current) return;
+    const url = externalUrl.trim();
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: nickname,
+      encrypted: encryptMessage("📎 Imagem externa", ROOM_PASSWORD),
+      timestamp: Date.now(),
+      gif: url,
+      mood: myMood || undefined,
+    };
+    channelRef.current.publish("message", msg);
+    setExternalUrl("");
+    setShowUrlInput(false);
+  };
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
     setYtVideo(evt);
