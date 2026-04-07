@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6 } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -24,6 +24,7 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import DiceGame from "@/components/chat/DiceGame";
 import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
@@ -196,6 +197,7 @@ export default function ChatPage() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
+  const [showDiceGame, setShowDiceGame] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
@@ -329,6 +331,14 @@ export default function ChatPage() {
         }
         return { ...m, reactions };
       }));
+    });
+    channel.subscribe("dice-roll", (msg: Ably.Message) => {
+      const data = msg.data as { nickname: string; result: number };
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(`🎲 ${data.nickname} rolou o dado e tirou ${data.result}!`, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
     });
   }, [room]);
 
@@ -622,6 +632,11 @@ export default function ChatPage() {
     channelRef.current.publish("message", msg);
     setExternalUrl("");
     setShowUrlInput(false);
+  };
+
+  const handleDiceRoll = (result: number) => {
+    if (!channelRef.current) return;
+    channelRef.current.publish("dice-roll", { nickname, result });
   };
 
   const handleYouTubeSubmit = (videoId: string) => {
@@ -922,6 +937,42 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
 
+      {/* GIF Picker Dialog */}
+      <Dialog open={showGifPicker} onOpenChange={setShowGifPicker}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <GifPicker
+            onSelect={(url) => { handleSendGif(url); setShowGifPicker(false); }}
+            onClose={() => setShowGifPicker(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* URL Input Dialog */}
+      <Dialog open={showUrlInput} onOpenChange={setShowUrlInput}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <div className="w-full bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between p-2 border-b border-border">
+              <span className="text-xs font-semibold text-foreground">📎 URL da Imagem ou GIF</span>
+              <button onClick={() => setShowUrlInput(false)} className="text-muted-foreground hover:text-foreground text-sm px-1">✕</button>
+            </div>
+            <div className="p-3 space-y-3">
+              <Input
+                placeholder="https://..."
+                value={externalUrl}
+                onChange={(e) => setExternalUrl(e.target.value)}
+                className="h-9 text-sm"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSendExternalUrl(); } }}
+              />
+              <Button type="button" className="w-full gap-2" onClick={handleSendExternalUrl} disabled={!externalUrl.trim()}>
+                <Send className="h-3.5 w-3.5" />
+                Enviar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Letter Composer Dialog */}
       <Dialog open={showLetterComposer} onOpenChange={setShowLetterComposer}>
         <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
@@ -933,6 +984,15 @@ export default function ChatPage() {
               setShowLetterComposer(false);
             }}
             onClose={() => setShowLetterComposer(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDiceGame} onOpenChange={setShowDiceGame}>
+        <DialogContent className="max-w-sm p-0 border-none bg-transparent shadow-none">
+          <DiceGame
+            onRoll={handleDiceRoll}
+            onClose={() => setShowDiceGame(false)}
           />
         </DialogContent>
       </Dialog>
@@ -1103,63 +1163,46 @@ export default function ChatPage() {
           <EmotionBar onSend={handleSendEmotion} />
           <div className="border-l border-border h-6 mx-1" />
           <MoodPicker currentMood={myMood} onSelect={handleMoodChange} />
-          <div className="relative">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowGifPicker(!showGifPicker)}
-              title="Enviar GIF"
-              className="h-8 px-2"
-            >
-              <span className="text-[10px] font-bold leading-none">GIF</span>
-            </Button>
-            {showGifPicker && (
-              <GifPicker
-                onSelect={handleSendGif}
-                onClose={() => setShowGifPicker(false)}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowUrlInput(!showUrlInput)}
-              title="Enviar imagem por URL"
-              className="h-8 w-8 p-0"
-            >
-              <Image className="h-3.5 w-3.5" />
-            </Button>
-            {showUrlInput && (
-              <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg p-2 z-50">
-                <p className="text-[10px] font-medium text-muted-foreground mb-1">URL da imagem ou GIF</p>
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="https://..."
-                    value={externalUrl}
-                    onChange={(e) => setExternalUrl(e.target.value)}
-                    className="h-7 text-xs flex-1"
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSendExternalUrl(); } }}
-                  />
-                  <Button type="button" size="sm" className="h-7 px-2" onClick={handleSendExternalUrl} disabled={!externalUrl.trim()}>
-                    <Send className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
           <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLetterComposer(!showLetterComposer)}
-              title="Carta Especial"
-              className="h-8 w-8 p-0"
-            >
-              <Mail className="h-3.5 w-3.5" />
-            </Button>
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGifPicker(true)}
+            title="Enviar GIF"
+            className="h-8 px-2"
+          >
+            <span className="text-[10px] font-bold leading-none">GIF</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUrlInput(true)}
+            title="Enviar imagem por URL"
+            className="h-8 w-8 p-0"
+          >
+            <Image className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowLetterComposer(true)}
+            title="Carta Especial"
+            className="h-8 w-8 p-0"
+          >
+            <Mail className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDiceGame(true)}
+            title="Jogo de Dado"
+            className="h-8 w-8 p-0"
+          >
+            <Dice6 className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
