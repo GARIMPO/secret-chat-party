@@ -1247,6 +1247,23 @@ export default function ChatPage() {
           >
             <Image className="h-3.5 w-3.5" />
           </Button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => imageInputRef.current?.click()}
+            title="Enviar imagem do dispositivo"
+            className="h-8 w-8 p-0"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+          </Button>
           <Button
             type="button"
             variant="outline"
