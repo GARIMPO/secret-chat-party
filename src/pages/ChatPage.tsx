@@ -279,19 +279,31 @@ export default function ChatPage() {
     });
     channel.subscribe("user-join", (msg: Ably.Message) => {
       const data = msg.data as { nickname: string; mood?: string };
-      updateMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), sender: "sistema",
-        encrypted: encryptMessage(`${data.mood ? data.mood + " " : ""}${data.nickname} entrou na sala`, ROOM_PASSWORD),
-        timestamp: Date.now(), system: true,
-      }]);
+      if (data.nickname === nicknameRef.current) return;
+      updateMessages((prev) => {
+        const joinText = `${data.mood ? data.mood + " " : ""}${data.nickname} entrou na sala`;
+        const isDup = prev.some((m) => m.system && m.timestamp > Date.now() - 5000 && decryptMessage(m.encrypted, ROOM_PASSWORD) === joinText);
+        if (isDup) return prev;
+        return [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(joinText, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }];
+      });
     });
     channel.subscribe("user-leave", (msg: Ably.Message) => {
       const data = msg.data as { nickname: string };
-      updateMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), sender: "sistema",
-        encrypted: encryptMessage(`${data.nickname} saiu da sala`, ROOM_PASSWORD),
-        timestamp: Date.now(), system: true,
-      }]);
+      if (data.nickname === nicknameRef.current) return;
+      updateMessages((prev) => {
+        const leaveText = `${data.nickname} saiu da sala`;
+        const isDup = prev.some((m) => m.system && m.timestamp > Date.now() - 5000 && decryptMessage(m.encrypted, ROOM_PASSWORD) === leaveText);
+        if (isDup) return prev;
+        return [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(leaveText, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }];
+      });
     });
     channel.subscribe("mood", (msg: Ably.Message) => {
       const data = msg.data as { nickname: string; mood: string };
