@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6 } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -216,6 +216,7 @@ export default function ChatPage() {
   const nicknameRef = useRef("");
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -657,6 +658,34 @@ export default function ChatPage() {
     channelRef.current.publish("dice-roll", { nickname, result });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !channelRef.current) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas imagens são permitidas!");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem muito grande! Máximo 5MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const msg: ChatMessage = {
+        id: crypto.randomUUID(),
+        sender: nickname,
+        encrypted: encryptMessage("📷 Imagem", ROOM_PASSWORD),
+        timestamp: Date.now(),
+        gif: dataUrl,
+        mood: myMood || undefined,
+      };
+      channelRef.current?.publish("message", msg);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
     setYtVideo(evt);
@@ -946,6 +975,11 @@ export default function ChatPage() {
           </div>
 
           <Button type="submit" className="w-full active:scale-[0.97]">Entrar na sala</Button>
+          {isAdminParam && (
+            <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/admin")}>
+              ← Voltar para a página principal
+            </Button>
+          )}
         </form>
       </div>
     );
@@ -1212,6 +1246,23 @@ export default function ChatPage() {
             className="h-8 w-8 p-0"
           >
             <Image className="h-3.5 w-3.5" />
+          </Button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => imageInputRef.current?.click()}
+            title="Enviar imagem do dispositivo"
+            className="h-8 w-8 p-0"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
           </Button>
           <Button
             type="button"
