@@ -696,7 +696,7 @@ export default function ChatPage() {
       if (isDiceMsg) {
         return (
           <div key={msg.id} className="flex justify-center my-2">
-            <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/15 border border-primary/30 text-foreground text-base font-bold animate-bounce shadow-lg">
+            <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/15 border border-primary/30 text-foreground text-base font-bold shadow-lg">
               <span className="text-2xl">🎲</span>
               <span>{decrypted.replace("🎲 ", "")}</span>
               <span className="text-xs opacity-60 font-normal">{time}</span>

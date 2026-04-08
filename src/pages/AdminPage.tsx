@@ -17,8 +17,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const ADMIN_LOGIN = "Jafuis";
-const ADMIN_PASSWORD = "Markinhos";
+const ADMIN_CREDENTIALS = [
+  { login: "Jafuis", password: "Markinhos" },
+  { login: "Noy", password: "NoyMarcos" },
+];
 const DEFAULT_ROOM_PASSWORD = "entrar2025";
 const ADMIN_SESSION_KEY = "admin-session";
 
@@ -42,7 +44,7 @@ export default function AdminPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+    if (ADMIN_CREDENTIALS.some(c => c.login === login && c.password === password)) {
       setIsAuthenticated(true);
       localStorage.setItem(ADMIN_SESSION_KEY, "true");
       setRooms(getAllRoomPasswords());
