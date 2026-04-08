@@ -44,7 +44,7 @@ export default function AdminPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+    if (ADMIN_CREDENTIALS.some(c => c.login === login && c.password === password)) {
       setIsAuthenticated(true);
       localStorage.setItem(ADMIN_SESSION_KEY, "true");
       setRooms(getAllRoomPasswords());
