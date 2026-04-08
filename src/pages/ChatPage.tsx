@@ -658,6 +658,34 @@ export default function ChatPage() {
     channelRef.current.publish("dice-roll", { nickname, result });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !channelRef.current) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas imagens são permitidas!");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem muito grande! Máximo 5MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const msg: ChatMessage = {
+        id: crypto.randomUUID(),
+        sender: nickname,
+        encrypted: encryptMessage("📷 Imagem", ROOM_PASSWORD),
+        timestamp: Date.now(),
+        gif: dataUrl,
+        mood: myMood || undefined,
+      };
+      channelRef.current?.publish("message", msg);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleYouTubeSubmit = (videoId: string) => {
     const evt: YouTubeEvent = { videoId, isPlaying: true };
     setYtVideo(evt);
