@@ -346,11 +346,17 @@ export default function ChatPage() {
     });
     channel.subscribe("dice-roll", (msg: Ably.Message) => {
       const data = msg.data as { nickname: string; result: number };
-      updateMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), sender: "sistema",
-        encrypted: encryptMessage(`🎲 ${data.nickname} rolou o dado e tirou ${data.result}!`, ROOM_PASSWORD),
-        timestamp: Date.now(), system: true,
-      }]);
+      const diceText = `🎲 ${data.nickname} rolou o dado e tirou ${data.result}!`;
+      updateMessages((prev) => {
+        const isDup = prev.some(m => m.system && m.timestamp && Date.now() - m.timestamp < 5000 &&
+          decryptMessage(m.encrypted, ROOM_PASSWORD) === diceText);
+        if (isDup) return prev;
+        return [...prev, {
+          id: crypto.randomUUID(), sender: "sistema",
+          encrypted: encryptMessage(diceText, ROOM_PASSWORD),
+          timestamp: Date.now(), system: true,
+        }];
+      });
     });
   }, [room]);
 
