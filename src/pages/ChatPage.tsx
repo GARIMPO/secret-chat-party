@@ -692,6 +692,18 @@ export default function ChatPage() {
     const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
 
     if (msg.system) {
+      const isDiceMsg = decrypted.startsWith("🎲");
+      if (isDiceMsg) {
+        return (
+          <div key={msg.id} className="flex justify-center my-2">
+            <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/15 border border-primary/30 text-foreground text-base font-bold animate-bounce shadow-lg">
+              <span className="text-2xl">🎲</span>
+              <span>{decrypted.replace("🎲 ", "")}</span>
+              <span className="text-xs opacity-60 font-normal">{time}</span>
+            </div>
+          </div>
+        );
+      }
       return (
         <div key={msg.id} className="flex justify-center">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 text-muted-foreground text-xs">
