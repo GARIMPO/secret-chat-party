@@ -946,6 +946,11 @@ export default function ChatPage() {
           </div>
 
           <Button type="submit" className="w-full active:scale-[0.97]">Entrar na sala</Button>
+          {isAdminParam && (
+            <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/admin")}>
+              ← Voltar para a página principal
+            </Button>
+          )}
         </form>
       </div>
     );
