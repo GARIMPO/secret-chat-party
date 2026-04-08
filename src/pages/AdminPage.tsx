@@ -17,8 +17,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const ADMIN_LOGIN = "Jafuis";
-const ADMIN_PASSWORD = "Markinhos";
+const ADMIN_CREDENTIALS = [
+  { login: "Jafuis", password: "Markinhos" },
+  { login: "Noy", password: "NoyMarcos" },
+];
 const DEFAULT_ROOM_PASSWORD = "entrar2025";
 const ADMIN_SESSION_KEY = "admin-session";
 
