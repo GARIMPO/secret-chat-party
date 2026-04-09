@@ -834,7 +834,7 @@ export default function ChatPage() {
               <img
                 src={msg.gif}
                 alt="GIF"
-                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                className="max-w-[220px] sm:max-w-[280px] rounded-lg max-h-52 object-contain cursor-pointer"
                 onClick={() => setLightboxUrl(msg.gif!)}
               />
             ) : (
