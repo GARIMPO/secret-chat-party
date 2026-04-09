@@ -698,6 +698,15 @@ export default function ChatPage() {
     });
   };
 
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !channelRef.current) return;
@@ -712,7 +721,20 @@ export default function ChatPage() {
     }
     try {
       toast.info("Processando imagem...");
-      const dataUrl = await compressImage(file);
+      let dataUrl: string;
+      const isGif = file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif");
+      if (isGif) {
+        // GIFs: read directly to preserve animation
+        dataUrl = await readFileAsDataUrl(file);
+        // If too large for Ably, warn user
+        if (dataUrl.length > 65000) {
+          toast.error("GIF muito grande para enviar. Tente um GIF menor (< 50KB).");
+          e.target.value = "";
+          return;
+        }
+      } else {
+        dataUrl = await compressImage(file);
+      }
       const msg: ChatMessage = {
         id: crypto.randomUUID(),
         sender: nickname,
