@@ -658,20 +658,61 @@ export default function ChatPage() {
     channelRef.current.publish("dice-roll", { nickname, result });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX_DIM = 480;
+        const MAX_BYTES = 50000; // stay under Ably 65KB limit
+        let w = img.width, h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        let quality = 0.7;
+        let dataUrl = canvas.toDataURL("image/jpeg", quality);
+        while (dataUrl.length > MAX_BYTES && quality > 0.1) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL("image/jpeg", quality);
+        }
+        if (dataUrl.length > MAX_BYTES) {
+          // shrink further
+          const ratio2 = 0.5;
+          canvas.width = Math.round(w * ratio2);
+          canvas.height = Math.round(h * ratio2);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL("image/jpeg", 0.5);
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Falha ao carregar imagem")); };
+      img.src = url;
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !channelRef.current) return;
-    if (!file.type.startsWith("image/") && file.type !== "image/gif") {
-      toast.error("Apenas imagens e GIFs são permitidos!");
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml", "image/jfif", "image/tiff"];
+    if (!file.type.startsWith("image/") && !validTypes.includes(file.type)) {
+      toast.error("Apenas imagens são permitidas!");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Imagem muito grande! Máximo 5MB.");
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Imagem muito grande! Máximo 20MB.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    try {
+      toast.info("Processando imagem...");
+      const dataUrl = await compressImage(file);
       const msg: ChatMessage = {
         id: crypto.randomUUID(),
         sender: nickname,
@@ -681,8 +722,9 @@ export default function ChatPage() {
         mood: myMood || undefined,
       };
       channelRef.current?.publish("message", msg);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      toast.error("Erro ao processar imagem.");
+    }
     e.target.value = "";
   };
 
@@ -1250,7 +1292,7 @@ export default function ChatPage() {
           <input
             ref={imageInputRef}
             type="file"
-            accept="image/*,.gif"
+            accept="image/*,.gif,.jfif,.bmp,.tiff,.webp"
             className="hidden"
             onChange={handleImageUpload}
           />
