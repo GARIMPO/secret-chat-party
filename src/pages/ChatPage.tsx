@@ -556,8 +556,10 @@ export default function ChatPage() {
       timestamp: Date.now(),
       gif: gifUrl,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
+    if (privateTo) setPrivateTo(null);
   };
 
   const handleSendEmotion = (emoji: string) => {
