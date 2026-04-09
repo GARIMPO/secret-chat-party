@@ -726,8 +726,10 @@ export default function ChatPage() {
         timestamp: Date.now(),
         gif: dataUrl,
         mood: myMood || undefined,
+        privateTo: privateTo || undefined,
       };
       channelRef.current?.publish("message", msg);
+      if (privateTo) setPrivateTo(null);
     } catch {
       toast.error("Erro ao processar imagem.");
     }
