@@ -661,8 +661,8 @@ export default function ChatPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !channelRef.current) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Apenas imagens são permitidas!");
+    if (!file.type.startsWith("image/") && file.type !== "image/gif") {
+      toast.error("Apenas imagens e GIFs são permitidos!");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
