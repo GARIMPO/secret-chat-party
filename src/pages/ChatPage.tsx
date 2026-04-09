@@ -1250,7 +1250,7 @@ export default function ChatPage() {
           <input
             ref={imageInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.gif"
             className="hidden"
             onChange={handleImageUpload}
           />
