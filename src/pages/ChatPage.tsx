@@ -653,10 +653,12 @@ export default function ChatPage() {
       timestamp: Date.now(),
       gif: url,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
     setExternalUrl("");
     setShowUrlInput(false);
+    if (privateTo) setPrivateTo(null);
   };
 
   const handleDiceRoll = (result: number) => {
