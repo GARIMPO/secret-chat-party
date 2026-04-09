@@ -539,9 +539,11 @@ export default function ChatPage() {
       timestamp: Date.now(),
       textColor: textColor || undefined,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
     setInput("");
+    if (privateTo) setPrivateTo(null);
     updateSessionActivity(room);
   };
 
