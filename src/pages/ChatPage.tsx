@@ -856,9 +856,17 @@ export default function ChatPage() {
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
         <div className={`inline-block max-w-[85%] sm:max-w-[75%]`}>
+          {isPrivate && (
+            <div className={`flex items-center gap-1 mb-0.5 text-[10px] text-primary/80 ${isSelf ? "justify-end" : "justify-start"}`}>
+              <MessageSquareLock className="h-3 w-3" />
+              <span>Privado {isSelf ? `para ${msg.privateTo}` : `de ${msg.sender}`}</span>
+            </div>
+          )}
           <div
             className={`rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
-              isSelf
+              isPrivate
+                ? "border-2 border-primary/30 " + (isSelf ? "bg-chat-self text-chat-self-foreground rounded-br-md" : "bg-chat-other text-chat-other-foreground rounded-bl-md")
+                : isSelf
                 ? "bg-chat-self text-chat-self-foreground rounded-br-md"
                 : isEncrypted
                 ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
