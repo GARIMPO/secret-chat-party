@@ -772,6 +772,13 @@ export default function ChatPage() {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
 
+    // Private messages: only visible to sender and recipient
+    if (msg.privateTo && msg.sender !== nickname && msg.privateTo !== nickname) {
+      return null;
+    }
+
+    const isPrivate = !!msg.privateTo;
+
     if (msg.system) {
       const isDiceMsg = decrypted.startsWith("🎲");
       if (isDiceMsg) {
