@@ -661,8 +661,8 @@ export default function ChatPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !channelRef.current) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Apenas imagens são permitidas!");
+    if (!file.type.startsWith("image/") && file.type !== "image/gif") {
+      toast.error("Apenas imagens e GIFs são permitidos!");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -834,7 +834,7 @@ export default function ChatPage() {
               <img
                 src={msg.gif}
                 alt="GIF"
-                className="max-w-full rounded-lg max-h-48 cursor-pointer"
+                className="max-w-[220px] sm:max-w-[280px] rounded-lg max-h-52 object-contain cursor-pointer"
                 onClick={() => setLightboxUrl(msg.gif!)}
               />
             ) : (
@@ -1250,7 +1250,7 @@ export default function ChatPage() {
           <input
             ref={imageInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.gif"
             className="hidden"
             onChange={handleImageUpload}
           />
