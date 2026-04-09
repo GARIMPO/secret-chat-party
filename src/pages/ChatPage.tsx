@@ -1390,9 +1390,69 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Private chat indicator */}
+        {privateTo && (
+          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+            <MessageSquareLock className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-xs text-foreground flex-1">
+              Modo privado: somente <strong>{privateTo}</strong> verá sua próxima mensagem
+            </span>
+            <button onClick={() => setPrivateTo(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 relative items-end">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant={privateTo ? "default" : "outline"}
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="Chat privado"
+              >
+                <MessageSquareLock className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-2" side="top" align="start">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">Enviar privado para:</p>
+              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                {onlineUsers.filter((u) => u !== nickname).length === 0 && (
+                  <p className="text-xs text-muted-foreground px-1 py-2">Ninguém online</p>
+                )}
+                {onlineUsers.filter((u) => u !== nickname).map((user) => (
+                  <button
+                    key={user}
+                    type="button"
+                    onClick={() => setPrivateTo(user)}
+                    className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                      privateTo === user
+                        ? "bg-primary/15 text-foreground font-medium"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {user}
+                  </button>
+                ))}
+                {privateTo && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <button
+                      type="button"
+                      onClick={() => setPrivateTo(null)}
+                      className="w-full text-left text-xs px-2 py-1.5 rounded-md text-destructive hover:bg-muted transition-colors"
+                    >
+                      ✕ Cancelar privado
+                    </button>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Textarea
-            placeholder="Digite sua mensagem..."
+            placeholder={privateTo ? `Mensagem privada para ${privateTo}...` : "Digite sua mensagem..."}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -1404,7 +1464,7 @@ export default function ChatPage() {
                 handleSend(e);
               }
             }}
-            className="flex-1 min-h-[56px] max-h-[56px] resize-none text-sm"
+            className={`flex-1 min-h-[56px] max-h-[56px] resize-none text-sm ${privateTo ? "border-primary/40" : ""}`}
             rows={2}
           />
           <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95] shrink-0">
