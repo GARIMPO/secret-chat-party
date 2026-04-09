@@ -62,6 +62,7 @@ interface ChatMessage {
     to: string;
     text: string;
   };
+  privateTo?: string;
 }
 
 interface EmotionEvent {
