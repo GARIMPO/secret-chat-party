@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -62,6 +62,7 @@ interface ChatMessage {
     to: string;
     text: string;
   };
+  privateTo?: string;
 }
 
 interface EmotionEvent {
@@ -198,6 +199,7 @@ export default function ChatPage() {
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
   const [showDiceGame, setShowDiceGame] = useState(false);
+  const [privateTo, setPrivateTo] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
@@ -537,9 +539,11 @@ export default function ChatPage() {
       timestamp: Date.now(),
       textColor: textColor || undefined,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
     setInput("");
+    if (privateTo) setPrivateTo(null);
     updateSessionActivity(room);
   };
 
@@ -552,8 +556,10 @@ export default function ChatPage() {
       timestamp: Date.now(),
       gif: gifUrl,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
+    if (privateTo) setPrivateTo(null);
   };
 
   const handleSendEmotion = (emoji: string) => {
@@ -647,10 +653,12 @@ export default function ChatPage() {
       timestamp: Date.now(),
       gif: url,
       mood: myMood || undefined,
+      privateTo: privateTo || undefined,
     };
     channelRef.current.publish("message", msg);
     setExternalUrl("");
     setShowUrlInput(false);
+    if (privateTo) setPrivateTo(null);
   };
 
   const handleDiceRoll = (result: number) => {
@@ -720,8 +728,10 @@ export default function ChatPage() {
         timestamp: Date.now(),
         gif: dataUrl,
         mood: myMood || undefined,
+        privateTo: privateTo || undefined,
       };
       channelRef.current?.publish("message", msg);
+      if (privateTo) setPrivateTo(null);
     } catch {
       toast.error("Erro ao processar imagem.");
     }
@@ -761,6 +771,13 @@ export default function ChatPage() {
     const isEncrypted = decrypted === msg.encrypted;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const displayFontSize = CHAT_FONT_SIZES[chatFontSize] || "text-base";
+
+    // Private messages: only visible to sender and recipient
+    if (msg.privateTo && msg.sender !== nickname && msg.privateTo !== nickname) {
+      return null;
+    }
+
+    const isPrivate = !!msg.privateTo;
 
     if (msg.system) {
       const isDiceMsg = decrypted.startsWith("🎲");
@@ -839,9 +856,17 @@ export default function ChatPage() {
     return (
       <div key={msg.id} className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
         <div className={`inline-block max-w-[85%] sm:max-w-[75%]`}>
+          {isPrivate && (
+            <div className={`flex items-center gap-1 mb-0.5 text-[10px] text-primary/80 ${isSelf ? "justify-end" : "justify-start"}`}>
+              <MessageSquareLock className="h-3 w-3" />
+              <span>Privado {isSelf ? `para ${msg.privateTo}` : `de ${msg.sender}`}</span>
+            </div>
+          )}
           <div
             className={`rounded-2xl px-3 sm:px-4 py-2 shadow-sm relative ${
-              isSelf
+              isPrivate
+                ? "border-2 border-primary/30 " + (isSelf ? "bg-chat-self text-chat-self-foreground rounded-br-md" : "bg-chat-other text-chat-other-foreground rounded-bl-md")
+                : isSelf
                 ? "bg-chat-self text-chat-self-foreground rounded-br-md"
                 : isEncrypted
                 ? "bg-chat-encrypted text-chat-encrypted-foreground rounded-bl-md border border-destructive/20"
@@ -1365,9 +1390,69 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Private chat indicator */}
+        {privateTo && (
+          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+            <MessageSquareLock className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-xs text-foreground flex-1">
+              Modo privado: somente <strong>{privateTo}</strong> verá sua próxima mensagem
+            </span>
+            <button onClick={() => setPrivateTo(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 relative items-end">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant={privateTo ? "default" : "outline"}
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="Chat privado"
+              >
+                <MessageSquareLock className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-2" side="top" align="start">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">Enviar privado para:</p>
+              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                {onlineUsers.filter((u) => u !== nickname).length === 0 && (
+                  <p className="text-xs text-muted-foreground px-1 py-2">Ninguém online</p>
+                )}
+                {onlineUsers.filter((u) => u !== nickname).map((user) => (
+                  <button
+                    key={user}
+                    type="button"
+                    onClick={() => setPrivateTo(user)}
+                    className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                      privateTo === user
+                        ? "bg-primary/15 text-foreground font-medium"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {user}
+                  </button>
+                ))}
+                {privateTo && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <button
+                      type="button"
+                      onClick={() => setPrivateTo(null)}
+                      className="w-full text-left text-xs px-2 py-1.5 rounded-md text-destructive hover:bg-muted transition-colors"
+                    >
+                      ✕ Cancelar privado
+                    </button>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Textarea
-            placeholder="Digite sua mensagem..."
+            placeholder={privateTo ? `Mensagem privada para ${privateTo}...` : "Digite sua mensagem..."}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -1379,7 +1464,7 @@ export default function ChatPage() {
                 handleSend(e);
               }
             }}
-            className="flex-1 min-h-[56px] max-h-[56px] resize-none text-sm"
+            className={`flex-1 min-h-[56px] max-h-[56px] resize-none text-sm ${privateTo ? "border-primary/40" : ""}`}
             rows={2}
           />
           <Button type="submit" size="icon" disabled={!input.trim()} className="active:scale-[0.95] shrink-0">
