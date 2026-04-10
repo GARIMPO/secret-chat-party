@@ -14,10 +14,12 @@ interface YouTubePlayerProps {
   videoId: string | null;
   isPlaying: boolean;
   onSubmitLink: (videoId: string) => void;
-  onTogglePlay: () => void;
+  onTogglePlay: (playing: boolean) => void;
   onClose: () => void;
   onSeek?: (time: number) => void;
   seekTo?: number | null;
+  onTimeUpdate?: (time: number) => void;
+  initialTime?: number;
 }
 
 function extractVideoId(url: string): string | null {
@@ -53,20 +55,20 @@ function loadYTApi(cb: () => void) {
 
 export default function YouTubePlayer({
   videoId, isPlaying, onSubmitLink, onTogglePlay, onClose, onSeek, seekTo,
+  onTimeUpdate, initialTime,
 }: YouTubePlayerProps) {
   const [linkInput, setLinkInput] = useState("");
   const [minimized, setMinimized] = useState(false);
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastSeekRef = useRef<number>(0);
-  const ignoreSeekRef = useRef(false);
+  const ignoreEventsRef = useRef(false);
 
   // Initialize YT player
   useEffect(() => {
     if (!videoId || minimized) return;
     loadYTApi(() => {
       if (!containerRef.current) return;
-      // Clear previous
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
@@ -78,13 +80,41 @@ export default function YouTubePlayer({
 
       playerRef.current = new window.YT.Player(div.id, {
         videoId,
-        playerVars: { autoplay: 1, enablejsapi: 1, rel: 0, modestbranding: 1 },
+        playerVars: {
+          autoplay: 1,
+          enablejsapi: 1,
+          rel: 0,
+          modestbranding: 1,
+          start: initialTime ? Math.floor(initialTime) : 0,
+        },
         events: {
+          onReady: () => {
+            // If we have an initial time, seek to it
+            if (initialTime && initialTime > 0) {
+              playerRef.current?.seekTo(initialTime, true);
+            }
+            // Apply current play state
+            if (!isPlaying) {
+              playerRef.current?.pauseVideo();
+            }
+          },
           onStateChange: (event: any) => {
-            // Detect user seeking by checking time jumps
-            if (event.data === window.YT.PlayerState.PLAYING || event.data === window.YT.PlayerState.PAUSED) {
-              const currentTime = playerRef.current?.getCurrentTime?.() || 0;
-              if (Math.abs(currentTime - lastSeekRef.current) > 3 && !ignoreSeekRef.current) {
+            if (ignoreEventsRef.current) return;
+            const state = event.data;
+            const currentTime = playerRef.current?.getCurrentTime?.() || 0;
+
+            if (state === window.YT.PlayerState.PLAYING) {
+              // User pressed play locally
+              onTogglePlay(true);
+              // Check for seek (time jump)
+              if (Math.abs(currentTime - lastSeekRef.current) > 3) {
+                onSeek?.(currentTime);
+              }
+              lastSeekRef.current = currentTime;
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              onTogglePlay(false);
+              // Check for seek
+              if (Math.abs(currentTime - lastSeekRef.current) > 3) {
                 onSeek?.(currentTime);
               }
               lastSeekRef.current = currentTime;
@@ -93,12 +123,14 @@ export default function YouTubePlayer({
         },
       });
 
-      // Periodically track time for seek detection
+      // Periodically report current time for new user sync
       const interval = setInterval(() => {
         if (playerRef.current?.getCurrentTime) {
-          lastSeekRef.current = playerRef.current.getCurrentTime();
+          const t = playerRef.current.getCurrentTime();
+          lastSeekRef.current = t;
+          onTimeUpdate?.(t);
         }
-      }, 1000);
+      }, 3000);
       return () => clearInterval(interval);
     });
 
@@ -110,13 +142,28 @@ export default function YouTubePlayer({
     };
   }, [videoId, minimized]);
 
+  // Handle remote play/pause
+  useEffect(() => {
+    if (!playerRef.current?.getPlayerState) return;
+    ignoreEventsRef.current = true;
+    try {
+      const state = playerRef.current.getPlayerState();
+      if (isPlaying && state !== window.YT.PlayerState.PLAYING) {
+        playerRef.current.playVideo();
+      } else if (!isPlaying && state === window.YT.PlayerState.PLAYING) {
+        playerRef.current.pauseVideo();
+      }
+    } catch {}
+    setTimeout(() => { ignoreEventsRef.current = false; }, 1000);
+  }, [isPlaying]);
+
   // Handle incoming seek
   useEffect(() => {
     if (seekTo != null && playerRef.current?.seekTo) {
-      ignoreSeekRef.current = true;
+      ignoreEventsRef.current = true;
       playerRef.current.seekTo(seekTo, true);
       lastSeekRef.current = seekTo;
-      setTimeout(() => { ignoreSeekRef.current = false; }, 2000);
+      setTimeout(() => { ignoreEventsRef.current = false; }, 2000);
     }
   }, [seekTo]);
 
@@ -155,7 +202,7 @@ export default function YouTubePlayer({
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface border-b border-border">
         <div className="flex items-center gap-2">
           <Music className="h-4 w-4 text-primary" />
-          <span className="text-xs text-muted-foreground font-medium">Assistindo juntos</span>
+          <span className="text-xs text-muted-foreground font-medium">Assistindo juntos (sincronizado)</span>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMinimized(!minimized)}>
