@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +9,18 @@ import {
 } from "@/components/ui/dialog";
 import { ImagePlus, Send, PartyPopper, X } from "lucide-react";
 
-// Placeholder images for decoy cards
+// Landscape-only decoy images
 const DECOY_IMAGES = [
-  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1518173946687-a1e6f902bfa4?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=200&h=200&fit=crop",
-  "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1518173946687-a1e6f902bfa4?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1465056836900-8f1e940f1f64?w=400&h=400&fit=crop",
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -37,11 +35,11 @@ function shuffle<T>(arr: T[]): T[] {
 export interface GuessGameData {
   id: string;
   sender: string;
-  image: string; // the real image (compressed dataUrl)
+  image: string;
   clue: string;
-  decoys: string[]; // 5 decoy image URLs
-  correctIndex: number; // index of real image in shuffled array
-  cards: string[]; // shuffled array of 6 images
+  decoys: string[];
+  correctIndex: number;
+  cards: string[];
 }
 
 export interface GuessGameResult {
@@ -59,7 +57,6 @@ interface ImageGuessGameCreatorProps {
 
 export function ImageGuessGameCreator({ open, onClose, onCreateGame }: ImageGuessGameCreatorProps) {
   const [image, setImage] = useState<string | null>(null);
-  const [clue, setClue] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,10 +86,9 @@ export function ImageGuessGameCreator({ open, onClose, onCreateGame }: ImageGues
   };
 
   const handleSubmit = () => {
-    if (!image || !clue.trim()) return;
-    onCreateGame(image, clue.trim());
+    if (!image) return;
+    onCreateGame(image, "");
     setImage(null);
-    setClue("");
     onClose();
   };
 
@@ -105,7 +101,7 @@ export function ImageGuessGameCreator({ open, onClose, onCreateGame }: ImageGues
             Jogo de Adivinhação
           </DialogTitle>
           <DialogDescription>
-            Envie uma imagem e escreva uma dica. Os outros jogadores tentarão adivinhar qual é a sua carta!
+            Envie uma imagem. Os outros jogadores tentarão adivinhar qual é a sua carta!
           </DialogDescription>
         </DialogHeader>
 
@@ -133,17 +129,7 @@ export function ImageGuessGameCreator({ open, onClose, onCreateGame }: ImageGues
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Escreva uma dica</label>
-            <Input
-              placeholder="Ex: Algo que brilha no céu..."
-              value={clue}
-              onChange={(e) => setClue(e.target.value)}
-              maxLength={100}
-            />
-          </div>
-
-          <Button onClick={handleSubmit} disabled={!image || !clue.trim()} className="w-full gap-2">
+          <Button onClick={handleSubmit} disabled={!image} className="w-full gap-2">
             <Send className="h-4 w-4" />
             Enviar Desafio
           </Button>
@@ -164,6 +150,7 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
   const [selected, setSelected] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [correct, setCorrect] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
 
   const isSender = game.sender === nickname;
 
@@ -174,22 +161,44 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
     setCorrect(isCorrect);
     setRevealed(true);
     onGuess(game.id, idx);
+    if (isCorrect) {
+      setTimeout(() => setShowFullImage(true), 800);
+    }
   };
+
+  // Show the correct image full-screen on correct guess
+  if (showFullImage) {
+    return (
+      <Dialog open onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-2xl flex flex-col items-center gap-4">
+          <div className="text-center text-2xl font-bold text-green-500 animate-scale-in">
+            🎉 Acertou! Parabéns!
+          </div>
+          <img
+            src={game.image}
+            alt="Carta correta"
+            className="max-h-[70vh] max-w-full rounded-2xl object-contain shadow-lg"
+          />
+          <p className="text-sm text-muted-foreground">Desafio de {game.sender}</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-md sm:max-w-lg">
+      <DialogContent className="max-w-xl sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PartyPopper className="h-5 w-5 text-primary" />
             {isSender ? "Seu desafio" : `Desafio de ${game.sender}`}
           </DialogTitle>
-          <DialogDescription className="text-base font-medium mt-1">
-            💡 Dica: "{game.clue}"
+          <DialogDescription>
+            Escolha a carta correta entre as 6 opções!
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           {game.cards.map((cardImg, idx) => {
             const isCorrectCard = idx === game.correctIndex;
             const isSelected = selected === idx;
@@ -207,7 +216,7 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
                 className={`relative rounded-xl overflow-hidden transition-all duration-300 ${borderClass} ${
                   !revealed && !isSender ? "hover:scale-105 active:scale-95" : ""
                 }`}
-                style={{ aspectRatio: "1" }}
+                style={{ aspectRatio: "1", minHeight: "120px" }}
               >
                 {/* Card back (unrevealed) */}
                 <div
@@ -215,7 +224,7 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
                     revealed && (isCorrectCard || isSelected) ? "opacity-0" : isSender ? "opacity-0" : ""
                   }`}
                 >
-                  <span className="text-3xl">🃏</span>
+                  <span className="text-5xl">🃏</span>
                 </div>
                 {/* Card image */}
                 <img
@@ -228,12 +237,12 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
                 />
                 {revealed && isCorrectCard && (
                   <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                    <span className="text-2xl">✅</span>
+                    <span className="text-3xl">✅</span>
                   </div>
                 )}
                 {revealed && isSelected && !correct && (
                   <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                    <span className="text-2xl">❌</span>
+                    <span className="text-3xl">❌</span>
                   </div>
                 )}
               </button>
@@ -247,9 +256,9 @@ export function ImageGuessGamePopup({ game, nickname, onGuess, onClose }: ImageG
           </p>
         )}
 
-        {revealed && (
-          <div className={`text-center text-lg font-bold animate-scale-in ${correct ? "text-green-500" : "text-destructive"}`}>
-            {correct ? "🎉 Acertou! Parabéns!" : "😢 Errou! Tente na próxima."}
+        {revealed && !correct && (
+          <div className="text-center text-lg font-bold animate-scale-in text-destructive">
+            😢 Errou! Tente na próxima.
           </div>
         )}
       </DialogContent>
@@ -330,9 +339,7 @@ export function ConfettiOverlay({ onDone }: { onDone: () => void }) {
 
 // Helper to create a game
 export function createGuessGame(sender: string, image: string, clue: string): GuessGameData {
-  // Pick 5 random decoys
   const shuffledDecoys = shuffle(DECOY_IMAGES).slice(0, 5);
-  // Create array of 6 cards, insert real image at random position
   const correctIndex = Math.floor(Math.random() * 6);
   const cards: string[] = [];
   let decoyIdx = 0;
