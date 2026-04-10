@@ -799,6 +799,19 @@ export default function ChatPage() {
     channelRef.current?.publish("youtube", evt);
   };
 
+  const handleCreateGuessGame = (image: string, clue: string) => {
+    const game = createGuessGame(nickname, image, clue);
+    channelRef.current?.publish("guess-game", game);
+    setActiveGuessGame(game);
+  };
+
+  const handleGuess = (gameId: string, index: number) => {
+    if (!activeGuessGame) return;
+    const correct = index === activeGuessGame.correctIndex;
+    const result: GuessGameResult = { gameId, guesser: nickname, correct, guessedIndex: index };
+    channelRef.current?.publish("guess-result", result);
+  };
+
   const handleYouTubeTimeUpdate = (time: number) => {
     setYtVideo(prev => {
       const updated = { ...prev, currentTime: time };
@@ -1395,6 +1408,16 @@ export default function ChatPage() {
           >
             <Dice6 className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGuessGame(true)}
+            title="Jogo de Adivinhação"
+            className="h-8 w-8 p-0"
+          >
+            <Puzzle className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
@@ -1545,6 +1568,23 @@ export default function ChatPage() {
           </Dialog>
         );
       })()}
+
+      <ImageGuessGameCreator
+        open={showGuessGame}
+        onClose={() => setShowGuessGame(false)}
+        onCreateGame={handleCreateGuessGame}
+      />
+
+      {activeGuessGame && (
+        <ImageGuessGamePopup
+          game={activeGuessGame}
+          nickname={nickname}
+          onGuess={handleGuess}
+          onClose={() => setActiveGuessGame(null)}
+        />
+      )}
+
+      {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
     </div>
   );
 }
