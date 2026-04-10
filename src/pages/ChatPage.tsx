@@ -372,6 +372,24 @@ export default function ChatPage() {
         }];
       });
     });
+    channel.subscribe("guess-game", (msg: Ably.Message) => {
+      const data = msg.data as GuessGameData;
+      setActiveGuessGame(data);
+    });
+    channel.subscribe("guess-result", (msg: Ably.Message) => {
+      const data = msg.data as GuessGameResult;
+      const resultText = data.correct
+        ? `🎉 ${data.guesser} acertou a carta no jogo de adivinhação!`
+        : `😢 ${data.guesser} errou a carta no jogo de adivinhação.`;
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(resultText, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
+      if (data.correct) {
+        setShowConfetti(true);
+      }
+    });
   }, [room]);
 
   // Auto-rejoin from saved session
