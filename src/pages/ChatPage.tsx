@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -207,6 +207,9 @@ export default function ChatPage() {
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
   const [showDiceGame, setShowDiceGame] = useState(false);
+  const [showGuessGame, setShowGuessGame] = useState(false);
+  const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
