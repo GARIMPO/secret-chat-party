@@ -74,7 +74,7 @@ interface EmotionEvent {
 interface YouTubeEvent {
   videoId: string | null;
   isPlaying: boolean;
-  seekTime?: number;
+  currentTime?: number;
 }
 
 const CHAT_FONT_SIZES: Record<string, string> = {
@@ -739,22 +739,23 @@ export default function ChatPage() {
   };
 
   const handleYouTubeSubmit = (videoId: string) => {
-    const evt: YouTubeEvent = { videoId, isPlaying: true };
+    const evt: YouTubeEvent = { videoId, isPlaying: true, currentTime: 0 };
     setYtVideo(evt);
     if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
   };
 
-  const handleYouTubeToggle = () => {
-    const evt: YouTubeEvent = { ...ytVideo, isPlaying: !ytVideo.isPlaying };
+  const handleYouTubeToggle = (playing: boolean) => {
+    const currentTime = ytVideo.currentTime || 0;
+    const evt: YouTubeEvent = { ...ytVideo, isPlaying: playing, currentTime };
     setYtVideo(evt);
     if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
     channelRef.current?.publish("youtube", evt);
   };
 
   const handleYouTubeClose = () => {
-    const evt: YouTubeEvent = { videoId: null, isPlaying: false };
+    const evt: YouTubeEvent = { videoId: null, isPlaying: false, currentTime: 0 };
     setYtVideo(evt);
     if (room) localStorage.removeItem(`yt-state-${room}`);
     channelRef.current?.publish("youtube", evt);
@@ -762,7 +763,19 @@ export default function ChatPage() {
   };
 
   const handleYouTubeSeek = (time: number) => {
+    const evt: YouTubeEvent = { ...ytVideo, currentTime: time };
+    setYtVideo(evt);
+    if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
     channelRef.current?.publish("youtube-seek", { time });
+    channelRef.current?.publish("youtube", evt);
+  };
+
+  const handleYouTubeTimeUpdate = (time: number) => {
+    setYtVideo(prev => {
+      const updated = { ...prev, currentTime: time };
+      if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const renderMessage = (msg: ChatMessage) => {
@@ -1255,6 +1268,8 @@ export default function ChatPage() {
           onClose={handleYouTubeClose}
           onSeek={handleYouTubeSeek}
           seekTo={ytSeekTo}
+          onTimeUpdate={handleYouTubeTimeUpdate}
+          initialTime={ytVideo.currentTime}
         />
       )}
 
