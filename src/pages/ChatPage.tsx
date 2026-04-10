@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -25,6 +25,14 @@ import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import DiceGame from "@/components/chat/DiceGame";
+import {
+  ImageGuessGameCreator,
+  ImageGuessGamePopup,
+  ConfettiOverlay,
+  createGuessGame,
+  type GuessGameData,
+  type GuessGameResult,
+} from "@/components/chat/ImageGuessGame";
 import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
@@ -199,6 +207,9 @@ export default function ChatPage() {
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
   const [showDiceGame, setShowDiceGame] = useState(false);
+  const [showGuessGame, setShowGuessGame] = useState(false);
+  const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -360,6 +371,24 @@ export default function ChatPage() {
           timestamp: Date.now(), system: true,
         }];
       });
+    });
+    channel.subscribe("guess-game", (msg: Ably.Message) => {
+      const data = msg.data as GuessGameData;
+      setActiveGuessGame(data);
+    });
+    channel.subscribe("guess-result", (msg: Ably.Message) => {
+      const data = msg.data as GuessGameResult;
+      const resultText = data.correct
+        ? `🎉 ${data.guesser} acertou a carta no jogo de adivinhação!`
+        : `😢 ${data.guesser} errou a carta no jogo de adivinhação.`;
+      updateMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), sender: "sistema",
+        encrypted: encryptMessage(resultText, ROOM_PASSWORD),
+        timestamp: Date.now(), system: true,
+      }]);
+      if (data.correct) {
+        setShowConfetti(true);
+      }
     });
   }, [room]);
 
@@ -768,6 +797,19 @@ export default function ChatPage() {
     if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
     channelRef.current?.publish("youtube-seek", { time });
     channelRef.current?.publish("youtube", evt);
+  };
+
+  const handleCreateGuessGame = (image: string, clue: string) => {
+    const game = createGuessGame(nickname, image, clue);
+    channelRef.current?.publish("guess-game", game);
+    setActiveGuessGame(game);
+  };
+
+  const handleGuess = (gameId: string, index: number) => {
+    if (!activeGuessGame) return;
+    const correct = index === activeGuessGame.correctIndex;
+    const result: GuessGameResult = { gameId, guesser: nickname, correct, guessedIndex: index };
+    channelRef.current?.publish("guess-result", result);
   };
 
   const handleYouTubeTimeUpdate = (time: number) => {
@@ -1366,6 +1408,16 @@ export default function ChatPage() {
           >
             <Dice6 className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGuessGame(true)}
+            title="Jogo de Adivinhação"
+            className="h-8 w-8 p-0"
+          >
+            <Puzzle className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
@@ -1516,6 +1568,23 @@ export default function ChatPage() {
           </Dialog>
         );
       })()}
+
+      <ImageGuessGameCreator
+        open={showGuessGame}
+        onClose={() => setShowGuessGame(false)}
+        onCreateGame={handleCreateGuessGame}
+      />
+
+      {activeGuessGame && (
+        <ImageGuessGamePopup
+          game={activeGuessGame}
+          nickname={nickname}
+          onGuess={handleGuess}
+          onClose={() => setActiveGuessGame(null)}
+        />
+      )}
+
+      {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
     </div>
   );
 }
