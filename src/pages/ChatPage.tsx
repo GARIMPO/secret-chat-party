@@ -33,6 +33,13 @@ import {
   type GuessGameData,
   type GuessGameResult,
 } from "@/components/chat/ImageGuessGame";
+import {
+  PongInviteChooser,
+  PongInvitePopup,
+  PongGameCanvas,
+  type PongInvite,
+  type PongAccept,
+} from "@/components/chat/PongGame";
 import parchmentBg from "@/assets/parchment.png";
 import {
   Dialog,
