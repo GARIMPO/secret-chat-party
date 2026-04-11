@@ -390,9 +390,10 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
             ref={canvasRef}
             width={CANVAS_W}
             height={CANVAS_H}
-            className="rounded-lg border border-border w-full max-w-[480px] touch-none cursor-pointer"
-            style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}` }}
-            onPointerMove={handlePointerMove}
+            className="rounded-lg border border-border w-full max-w-[480px] cursor-pointer"
+            style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}`, touchAction: 'none' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerEvent}
           />
           {winner && (
             <div className="text-center animate-scale-in">
