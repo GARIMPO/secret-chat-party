@@ -201,8 +201,9 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     };
   }, []);
 
-  // Touch/mouse controls
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  // Touch/mouse controls - handle both move and touch
+  const handlePointerEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -216,6 +217,12 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     }
     channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: clamped });
   }, [channel, gameId, nickname, isHost]);
+
+  // Capture pointer on down for mobile
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    handlePointerEvent(e);
+  }, [handlePointerEvent]);
 
   // Game loop
   useEffect(() => {
@@ -383,9 +390,10 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
             ref={canvasRef}
             width={CANVAS_W}
             height={CANVAS_H}
-            className="rounded-lg border border-border w-full max-w-[480px] touch-none cursor-pointer"
-            style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}` }}
-            onPointerMove={handlePointerMove}
+            className="rounded-lg border border-border w-full max-w-[480px] cursor-pointer"
+            style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}`, touchAction: 'none' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerEvent}
           />
           {winner && (
             <div className="text-center animate-scale-in">
