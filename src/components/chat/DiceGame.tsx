@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from "lucide-react";
 
@@ -9,10 +9,18 @@ interface DiceGameProps {
 
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 
+// Crypto-quality random integer [0, max)
+function secureRandom(max: number): number {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return array[0] % max;
+}
+
 export default function DiceGame({ onRoll, onClose }: DiceGameProps) {
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState<number | null>(null);
   const [animValue, setAnimValue] = useState(0);
+  const lastAnimRef = useRef(-1);
 
   const handleRoll = () => {
     if (rolling) return;
@@ -21,19 +29,24 @@ export default function DiceGame({ onRoll, onClose }: DiceGameProps) {
 
     let count = 0;
     const interval = setInterval(() => {
-      setAnimValue(Math.floor(Math.random() * 6));
+      // Ensure animation never shows the same face twice in a row
+      let next: number;
+      do {
+        next = secureRandom(6);
+      } while (next === lastAnimRef.current);
+      lastAnimRef.current = next;
+      setAnimValue(next);
       count++;
-      if (count > 15) {
+      if (count > 18) {
         clearInterval(interval);
-        const final = Math.floor(Math.random() * 6) + 1;
+        const final = secureRandom(6) + 1;
         setResult(final);
         setAnimValue(final - 1);
         setRolling(false);
         onRoll(final);
       }
-    }, 100);
+    }, 80);
   };
-
   const DiceIcon = DICE_ICONS[rolling ? animValue : result ? result - 1 : 0];
 
   return (
