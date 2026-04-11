@@ -201,8 +201,9 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     };
   }, []);
 
-  // Touch/mouse controls
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  // Touch/mouse controls - handle both move and touch
+  const handlePointerEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -216,6 +217,12 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     }
     channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: clamped });
   }, [channel, gameId, nickname, isHost]);
+
+  // Capture pointer on down for mobile
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    handlePointerEvent(e);
+  }, [handlePointerEvent]);
 
   // Game loop
   useEffect(() => {
