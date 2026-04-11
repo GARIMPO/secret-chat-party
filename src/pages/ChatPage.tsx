@@ -402,6 +402,19 @@ export default function ChatPage() {
         setShowConfetti(true);
       }
     });
+    channel.subscribe("pong-invite", (msg: Ably.Message) => {
+      const data = msg.data as PongInvite;
+      if (data.to === nicknameRef.current) {
+        setPendingPongInvite(data);
+      }
+    });
+    channel.subscribe("pong-accept", (msg: Ably.Message) => {
+      const data = msg.data as PongAccept;
+      if (data.to === nicknameRef.current) {
+        setActivePongGame({ id: data.id, opponent: data.from, isHost: true });
+        setPendingPongInvite(null);
+      }
+    });
   }, [room]);
 
   // Auto-rejoin from saved session
