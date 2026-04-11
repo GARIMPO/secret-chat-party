@@ -1635,6 +1635,33 @@ export default function ChatPage() {
       )}
 
       {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
+
+      <PongInviteChooser
+        open={showPongInvite}
+        onClose={() => setShowPongInvite(false)}
+        onlineUsers={onlineUsers}
+        nickname={nickname}
+        onInvite={handlePongInvite}
+      />
+
+      {pendingPongInvite && (
+        <PongInvitePopup
+          invite={pendingPongInvite}
+          onAccept={handlePongAccept}
+          onDecline={() => setPendingPongInvite(null)}
+        />
+      )}
+
+      {activePongGame && channelRef.current && (
+        <PongGameCanvas
+          channel={channelRef.current}
+          gameId={activePongGame.id}
+          nickname={nickname}
+          opponent={activePongGame.opponent}
+          isHost={activePongGame.isHost}
+          onClose={() => setActivePongGame(null)}
+        />
+      )}
     </div>
   );
 }
