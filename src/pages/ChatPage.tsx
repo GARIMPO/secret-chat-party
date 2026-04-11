@@ -860,7 +860,8 @@ export default function ChatPage() {
   };
 
 
-    const renderMessage = (msg: ChatMessage) => {
+  const renderMessage = (msg: ChatMessage) => {
+    const isSelf = msg.sender === nickname;
     const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
     const isEncrypted = decrypted === msg.encrypted;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
