@@ -845,7 +845,21 @@ export default function ChatPage() {
     });
   };
 
-  const renderMessage = (msg: ChatMessage) => {
+  const handlePongInvite = (target: string) => {
+    const invite: PongInvite = { id: crypto.randomUUID(), from: nickname, to: target };
+    channelRef.current?.publish("pong-invite", invite);
+    toast.info(`Convite de Ping Pong enviado para ${target}!`);
+  };
+
+  const handlePongAccept = () => {
+    if (!pendingPongInvite) return;
+    const accept: PongAccept = { id: pendingPongInvite.id, from: nickname, to: pendingPongInvite.from };
+    channelRef.current?.publish("pong-accept", accept);
+    setActivePongGame({ id: pendingPongInvite.id, opponent: pendingPongInvite.from, isHost: false });
+    setPendingPongInvite(null);
+  };
+
+
     const isSelf = msg.sender === nickname;
     const decrypted = decryptMessage(msg.encrypted, ROOM_PASSWORD);
     const isEncrypted = decrypted === msg.encrypted;
