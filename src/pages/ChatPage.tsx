@@ -1458,6 +1458,16 @@ export default function ChatPage() {
           >
             <Puzzle className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPongInvite(true)}
+            title="Ping Pong"
+            className="h-8 w-8 p-0"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
