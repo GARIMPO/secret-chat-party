@@ -115,7 +115,7 @@ interface PongGameCanvasProps {
   gameId: string;
   nickname: string;
   opponent: string;
-  isHost: boolean;
+  isHost: boolean; // host = player 1 (left), guest = player 2 (right)
   onClose: () => void;
 }
 
@@ -124,49 +124,18 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
   const stateRef = useRef({
     ballX: CANVAS_W / 2,
     ballY: CANVAS_H / 2,
-    ballVX: 0,
-    ballVY: 0,
+    ballVX: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
+    ballVY: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
     p1Y: CANVAS_H / 2 - PADDLE_H / 2,
     p2Y: CANVAS_H / 2 - PADDLE_H / 2,
     score1: 0,
     score2: 0,
     gameOver: false,
-    started: false,
   });
   const keysRef = useRef<Set<string>>(new Set());
   const animRef = useRef<number>(0);
   const [score, setScore] = useState({ s1: 0, s2: 0 });
   const [winner, setWinner] = useState<string | null>(null);
-  const [started, setStarted] = useState(false);
-
-  // Launch ball helper
-  const launchBall = useCallback(() => {
-    const s = stateRef.current;
-    if (s.started || s.gameOver) return;
-    s.started = true;
-    s.ballVX = BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
-    s.ballVY = BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
-    setStarted(true);
-    // Sync start to guest
-    channel.publish(`pong-start-${gameId}`, { ballVX: s.ballVX, ballVY: s.ballVY });
-  }, [channel, gameId]);
-
-  // Listen for start event (guest receives from host)
-  useEffect(() => {
-    if (isHost) return;
-    const handler = (msg: Ably.Message) => {
-      const data = msg.data as { ballVX: number; ballVY: number };
-      const s = stateRef.current;
-      if (!s.started) {
-        s.started = true;
-        s.ballVX = data.ballVX;
-        s.ballVY = data.ballVY;
-        setStarted(true);
-      }
-    };
-    channel.subscribe(`pong-start-${gameId}`, handler);
-    return () => { channel.unsubscribe(`pong-start-${gameId}`, handler); };
-  }, [channel, gameId, isHost]);
 
   // Remote paddle update
   useEffect(() => {
@@ -182,6 +151,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     };
     channel.subscribe(subName, handler);
 
+    // Host syncs ball state
     if (!isHost) {
       const ballHandler = (msg: Ably.Message) => {
         const data = msg.data as PongState;
@@ -214,14 +184,9 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     return () => { channel.unsubscribe(`pong-over-${gameId}`, handler); };
   }, [channel, gameId]);
 
-  // Keyboard - space to start, arrows to move
+  // Keyboard
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === " " && isHost) {
-        e.preventDefault();
-        launchBall();
-        return;
-      }
       if (["ArrowUp", "ArrowDown", "w", "s"].includes(e.key)) {
         e.preventDefault();
         keysRef.current.add(e.key);
@@ -234,9 +199,9 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [isHost, launchBall]);
+  }, []);
 
-  // Touch/mouse controls
+  // Touch/mouse controls - handle both move and touch
   const handlePointerEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -253,34 +218,17 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: clamped });
   }, [channel, gameId, nickname, isHost]);
 
+  // Capture pointer on down for mobile
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
-    const s = stateRef.current;
-    // Tap on ball area to start (mobile) - only host can start
-    if (!s.started && isHost) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = CANVAS_W / rect.width;
-        const scaleY = CANVAS_H / rect.height;
-        const tx = (e.clientX - rect.left) * scaleX;
-        const ty = (e.clientY - rect.top) * scaleY;
-        const dist = Math.sqrt((tx - s.ballX) ** 2 + (ty - s.ballY) ** 2);
-        if (dist < 50) {
-          launchBall();
-          return;
-        }
-      }
-    }
     handlePointerEvent(e);
-  }, [handlePointerEvent, isHost, launchBall]);
+  }, [handlePointerEvent]);
 
   // Game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas.getContext("2d")!;
     let syncCounter = 0;
 
     const loop = () => {
@@ -300,20 +248,23 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
         s[myPaddle] = Math.min(CANVAS_H - PADDLE_H, s[myPaddle] + PADDLE_SPEED);
       }
 
+      // Send paddle position
       if (keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("w") || keys.has("s")) {
         channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: s[myPaddle] });
       }
 
-      // Only host runs ball physics and only if started
-      if (isHost && s.started) {
+      // Only host runs ball physics
+      if (isHost) {
         s.ballX += s.ballVX;
         s.ballY += s.ballVY;
 
+        // Top/bottom bounce
         if (s.ballY - BALL_R <= 0 || s.ballY + BALL_R >= CANVAS_H) {
           s.ballVY = -s.ballVY;
           s.ballY = Math.max(BALL_R, Math.min(CANVAS_H - BALL_R, s.ballY));
         }
 
+        // Left paddle collision
         if (
           s.ballX - BALL_R <= PADDLE_W + 10 &&
           s.ballY >= s.p1Y &&
@@ -324,6 +275,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
           s.ballX = PADDLE_W + 10 + BALL_R;
         }
 
+        // Right paddle collision
         if (
           s.ballX + BALL_R >= CANVAS_W - PADDLE_W - 10 &&
           s.ballY >= s.p2Y &&
@@ -334,6 +286,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
           s.ballX = CANVAS_W - PADDLE_W - 10 - BALL_R;
         }
 
+        // Score
         if (s.ballX < 0) {
           s.score2++;
           setScore({ s1: s.score1, s2: s.score2 });
@@ -344,6 +297,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
           resetBall(s);
         }
 
+        // Win check
         if (s.score1 >= WIN_SCORE || s.score2 >= WIN_SCORE) {
           const w = s.score1 >= WIN_SCORE ? nickname : opponent;
           setWinner(w);
@@ -351,6 +305,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
           channel.publish(`pong-over-${gameId}`, { winner: w });
         }
 
+        // Sync ball to guest
         syncCounter++;
         if (syncCounter % 3 === 0) {
           channel.publish(`pong-ball-${gameId}`, {
@@ -374,12 +329,12 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
   function resetBall(s: typeof stateRef.current) {
     s.ballX = CANVAS_W / 2;
     s.ballY = CANVAS_H / 2;
-    // After scoring, ball restarts automatically
     s.ballVX = BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
     s.ballVY = BALL_SPEED * (Math.random() > 0.5 ? 1 : -1);
   }
 
   function drawState(ctx: CanvasRenderingContext2D, s: typeof stateRef.current) {
+    // Background
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
@@ -411,28 +366,6 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     ctx.textAlign = "center";
     ctx.fillText(String(s.score1), CANVAS_W / 4, 40);
     ctx.fillText(String(s.score2), (CANVAS_W * 3) / 4, 40);
-
-    // "Press to start" hint
-    if (!s.started && !s.gameOver) {
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      if (s.ballVX === 0) {
-        // Pulsing ball glow
-        const t = Date.now() % 1000 / 1000;
-        const glow = 12 + Math.sin(t * Math.PI * 2) * 6;
-        ctx.shadowColor = "#ffd166";
-        ctx.shadowBlur = glow;
-        ctx.beginPath();
-        ctx.arc(s.ballX, s.ballY, BALL_R + 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.font = "14px sans-serif";
-        ctx.fillText("Espaço ou toque na bola para iniciar", CANVAS_W / 2, CANVAS_H - 20);
-      }
-    }
   }
 
   return (
@@ -444,11 +377,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
             🏓 {isHost ? nickname : opponent} vs {isHost ? opponent : nickname}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {!started
-              ? isHost
-                ? "Pressione Espaço ou toque na bola para começar!"
-                : "Aguardando o oponente iniciar..."
-              : `Use ↑↓ ou toque/arraste para mover. Primeiro a ${WIN_SCORE} pontos vence!`}
+            Use ↑↓ ou toque/arraste para mover. Primeiro a {WIN_SCORE} pontos vence!
           </DialogDescription>
         </DialogHeader>
 
