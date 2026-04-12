@@ -4,16 +4,13 @@ import Ably from "ably";
 const ABLY_API_KEY = "LRk72A.mvBoUw:24WIMiGh9X_3UcW9gfJrZ45nEG71ArcuUE3IbPUhRTE";
 
 let client: Ably.Realtime | null = null;
-let currentClientId: string | null = null;
 
 export function getAblyClient(clientId: string): Ably.Realtime {
-  if (!client || currentClientId !== clientId) {
-    client?.close();
+  if (!client) {
     client = new Ably.Realtime({
       key: ABLY_API_KEY,
       clientId,
     });
-    currentClientId = clientId;
   }
   return client;
 }

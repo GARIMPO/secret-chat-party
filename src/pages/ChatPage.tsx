@@ -411,7 +411,6 @@ export default function ChatPage() {
     channel.subscribe("pong-accept", (msg: Ably.Message) => {
       const data = msg.data as PongAccept;
       if (data.to === nicknameRef.current) {
-        setShowPongInvite(false);
         setActivePongGame({ id: data.id, opponent: data.from, isHost: true });
         setPendingPongInvite(null);
       }
@@ -856,7 +855,6 @@ export default function ChatPage() {
     if (!pendingPongInvite) return;
     const accept: PongAccept = { id: pendingPongInvite.id, from: nickname, to: pendingPongInvite.from };
     channelRef.current?.publish("pong-accept", accept);
-    setShowPongInvite(false);
     setActivePongGame({ id: pendingPongInvite.id, opponent: pendingPongInvite.from, isHost: false });
     setPendingPongInvite(null);
   };
