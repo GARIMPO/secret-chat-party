@@ -217,6 +217,9 @@ export default function ChatPage() {
   const [showGuessGame, setShowGuessGame] = useState(false);
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showAsteroidsInvite, setShowAsteroidsInvite] = useState(false);
+  const [pendingAsteroidsInvite, setPendingAsteroidsInvite] = useState<AsteroidsInvite | null>(null);
+  const [activeAsteroidsGame, setActiveAsteroidsGame] = useState<AsteroidsGameState | null>(null);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
