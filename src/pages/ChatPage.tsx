@@ -1640,6 +1640,31 @@ export default function ChatPage() {
 
       {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
 
+      <AsteroidsInviteChooser
+        open={showAsteroidsInvite}
+        onClose={() => setShowAsteroidsInvite(false)}
+        onlineUsers={onlineUsers}
+        nickname={nickname}
+        onInvite={handleAsteroidsInvite}
+      />
+
+      {pendingAsteroidsInvite && (
+        <AsteroidsInvitePopup
+          invite={pendingAsteroidsInvite}
+          onAccept={handleAsteroidsAccept}
+          onDecline={() => setPendingAsteroidsInvite(null)}
+        />
+      )}
+
+      {activeAsteroidsGame && (
+        <AsteroidsGameCanvas
+          game={activeAsteroidsGame}
+          nickname={nickname}
+          channel={channelRef.current}
+          onClose={() => setActiveAsteroidsGame(null)}
+        />
+      )}
+
     </div>
   );
 }
