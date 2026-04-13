@@ -1462,6 +1462,16 @@ export default function ChatPage() {
           >
             <Puzzle className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAsteroidsInvite(true)}
+            title="Asteroides"
+            className="h-8 w-8 p-0"
+          >
+            <Rocket className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
