@@ -35,6 +35,13 @@ import {
 } from "@/components/chat/ImageGuessGame";
 import parchmentBg from "@/assets/parchment.png";
 import {
+  AsteroidsInviteChooser,
+  AsteroidsInvitePopup,
+  AsteroidsGameCanvas,
+  type AsteroidsInvite,
+  type AsteroidsGameState,
+} from "@/components/chat/AsteroidsGame";
+import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
