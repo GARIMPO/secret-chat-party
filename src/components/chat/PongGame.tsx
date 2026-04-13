@@ -34,6 +34,8 @@ export interface PongAccept {
 interface PongState {
   ballX: number;
   ballY: number;
+  ballVX: number;
+  ballVY: number;
   p1Y: number;
   p2Y: number;
   score1: number;
@@ -115,7 +117,7 @@ interface PongGameCanvasProps {
   gameId: string;
   nickname: string;
   opponent: string;
-  isHost: boolean; // host = player 1 (left), guest = player 2 (right)
+  isHost: boolean;
   onClose: () => void;
 }
 
@@ -124,18 +126,57 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
   const stateRef = useRef({
     ballX: CANVAS_W / 2,
     ballY: CANVAS_H / 2,
-    ballVX: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
+    ballVX: BALL_SPEED,
     ballVY: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
     p1Y: CANVAS_H / 2 - PADDLE_H / 2,
     p2Y: CANVAS_H / 2 - PADDLE_H / 2,
     score1: 0,
     score2: 0,
     gameOver: false,
+    started: false,
   });
   const keysRef = useRef<Set<string>>(new Set());
   const animRef = useRef<number>(0);
   const [score, setScore] = useState({ s1: 0, s2: 0 });
   const [winner, setWinner] = useState<string | null>(null);
+  const [waitingStart, setWaitingStart] = useState(true);
+
+  // Host announces ready state so guest knows the game is live
+  useEffect(() => {
+    if (isHost) {
+      // Send ready signal repeatedly until guest confirms
+      const interval = setInterval(() => {
+        channel.publish(`pong-ready-${gameId}`, { host: nickname });
+      }, 500);
+      
+      const handler = (msg: Ably.Message) => {
+        const data = msg.data as { guest: string };
+        if (data.guest === opponent) {
+          clearInterval(interval);
+          stateRef.current.started = true;
+          setWaitingStart(false);
+        }
+      };
+      channel.subscribe(`pong-guest-ready-${gameId}`, handler);
+      
+      return () => {
+        clearInterval(interval);
+        channel.unsubscribe(`pong-guest-ready-${gameId}`, handler);
+      };
+    } else {
+      // Guest waits for host ready, then confirms
+      const handler = (msg: Ably.Message) => {
+        const data = msg.data as { host: string };
+        if (data.host === opponent) {
+          channel.publish(`pong-guest-ready-${gameId}`, { guest: nickname });
+          stateRef.current.started = true;
+          setWaitingStart(false);
+        }
+      };
+      channel.subscribe(`pong-ready-${gameId}`, handler);
+      return () => { channel.unsubscribe(`pong-ready-${gameId}`, handler); };
+    }
+  }, [channel, gameId, nickname, opponent, isHost]);
 
   // Remote paddle update
   useEffect(() => {
@@ -151,16 +192,18 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     };
     channel.subscribe(subName, handler);
 
-    // Host syncs ball state
+    // Guest receives full ball state from host
     if (!isHost) {
       const ballHandler = (msg: Ably.Message) => {
         const data = msg.data as PongState;
         const s = stateRef.current;
         s.ballX = data.ballX;
         s.ballY = data.ballY;
+        s.ballVX = data.ballVX;
+        s.ballVY = data.ballVY;
+        s.p1Y = data.p1Y;
         s.score1 = data.score1;
         s.score2 = data.score2;
-        s.p1Y = data.p1Y;
         setScore({ s1: data.score1, s2: data.score2 });
       };
       channel.subscribe(`pong-ball-${gameId}`, ballHandler);
@@ -201,7 +244,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     };
   }, []);
 
-  // Touch/mouse controls - handle both move and touch
+  // Touch/mouse controls
   const handlePointerEvent = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -218,7 +261,6 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: clamped });
   }, [channel, gameId, nickname, isHost]);
 
-  // Capture pointer on down for mobile
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     handlePointerEvent(e);
@@ -230,91 +272,116 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let syncCounter = 0;
+    let lastPaddlePublish = 0;
 
     const loop = () => {
       const s = stateRef.current;
+
+      // Move my paddle via keyboard
+      const keys = keysRef.current;
+      const myPaddle = isHost ? "p1Y" : "p2Y";
+      let moved = false;
+      if (keys.has("ArrowUp") || keys.has("w")) {
+        s[myPaddle] = Math.max(0, s[myPaddle] - PADDLE_SPEED);
+        moved = true;
+      }
+      if (keys.has("ArrowDown") || keys.has("s")) {
+        s[myPaddle] = Math.min(CANVAS_H - PADDLE_H, s[myPaddle] + PADDLE_SPEED);
+        moved = true;
+      }
+
+      // Throttle paddle publish to every 2 frames
+      if (moved) {
+        lastPaddlePublish++;
+        if (lastPaddlePublish % 2 === 0) {
+          channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: s[myPaddle] });
+        }
+      }
+
       if (s.gameOver) {
         drawState(ctx, s);
         return;
       }
 
-      // Move my paddle via keyboard
-      const keys = keysRef.current;
-      const myPaddle = isHost ? "p1Y" : "p2Y";
-      if (keys.has("ArrowUp") || keys.has("w")) {
-        s[myPaddle] = Math.max(0, s[myPaddle] - PADDLE_SPEED);
-      }
-      if (keys.has("ArrowDown") || keys.has("s")) {
-        s[myPaddle] = Math.min(CANVAS_H - PADDLE_H, s[myPaddle] + PADDLE_SPEED);
-      }
+      // Ball physics - host authoritative, guest interpolates locally between syncs
+      if (s.started) {
+        if (isHost) {
+          s.ballX += s.ballVX;
+          s.ballY += s.ballVY;
 
-      // Send paddle position
-      if (keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("w") || keys.has("s")) {
-        channel.publish(`pong-paddle-${gameId}`, { player: nickname, y: s[myPaddle] });
-      }
+          // Top/bottom bounce
+          if (s.ballY - BALL_R <= 0) {
+            s.ballVY = Math.abs(s.ballVY);
+            s.ballY = BALL_R;
+          }
+          if (s.ballY + BALL_R >= CANVAS_H) {
+            s.ballVY = -Math.abs(s.ballVY);
+            s.ballY = CANVAS_H - BALL_R;
+          }
 
-      // Only host runs ball physics
-      if (isHost) {
-        s.ballX += s.ballVX;
-        s.ballY += s.ballVY;
+          // Left paddle collision
+          if (
+            s.ballX - BALL_R <= PADDLE_W + 10 &&
+            s.ballY >= s.p1Y &&
+            s.ballY <= s.p1Y + PADDLE_H &&
+            s.ballVX < 0
+          ) {
+            s.ballVX = Math.abs(s.ballVX) * 1.05;
+            s.ballX = PADDLE_W + 10 + BALL_R;
+          }
 
-        // Top/bottom bounce
-        if (s.ballY - BALL_R <= 0 || s.ballY + BALL_R >= CANVAS_H) {
-          s.ballVY = -s.ballVY;
-          s.ballY = Math.max(BALL_R, Math.min(CANVAS_H - BALL_R, s.ballY));
-        }
+          // Right paddle collision
+          if (
+            s.ballX + BALL_R >= CANVAS_W - PADDLE_W - 10 &&
+            s.ballY >= s.p2Y &&
+            s.ballY <= s.p2Y + PADDLE_H &&
+            s.ballVX > 0
+          ) {
+            s.ballVX = -(Math.abs(s.ballVX) * 1.05);
+            s.ballX = CANVAS_W - PADDLE_W - 10 - BALL_R;
+          }
 
-        // Left paddle collision
-        if (
-          s.ballX - BALL_R <= PADDLE_W + 10 &&
-          s.ballY >= s.p1Y &&
-          s.ballY <= s.p1Y + PADDLE_H &&
-          s.ballVX < 0
-        ) {
-          s.ballVX = -s.ballVX * 1.05;
-          s.ballX = PADDLE_W + 10 + BALL_R;
-        }
+          // Score
+          if (s.ballX < 0) {
+            s.score2++;
+            setScore({ s1: s.score1, s2: s.score2 });
+            resetBall(s);
+          } else if (s.ballX > CANVAS_W) {
+            s.score1++;
+            setScore({ s1: s.score1, s2: s.score2 });
+            resetBall(s);
+          }
 
-        // Right paddle collision
-        if (
-          s.ballX + BALL_R >= CANVAS_W - PADDLE_W - 10 &&
-          s.ballY >= s.p2Y &&
-          s.ballY <= s.p2Y + PADDLE_H &&
-          s.ballVX > 0
-        ) {
-          s.ballVX = -s.ballVX * 1.05;
-          s.ballX = CANVAS_W - PADDLE_W - 10 - BALL_R;
-        }
+          // Win check
+          if (s.score1 >= WIN_SCORE || s.score2 >= WIN_SCORE) {
+            const w = s.score1 >= WIN_SCORE ? nickname : opponent;
+            setWinner(w);
+            s.gameOver = true;
+            channel.publish(`pong-over-${gameId}`, { winner: w });
+          }
 
-        // Score
-        if (s.ballX < 0) {
-          s.score2++;
-          setScore({ s1: s.score1, s2: s.score2 });
-          resetBall(s);
-        } else if (s.ballX > CANVAS_W) {
-          s.score1++;
-          setScore({ s1: s.score1, s2: s.score2 });
-          resetBall(s);
-        }
-
-        // Win check
-        if (s.score1 >= WIN_SCORE || s.score2 >= WIN_SCORE) {
-          const w = s.score1 >= WIN_SCORE ? nickname : opponent;
-          setWinner(w);
-          s.gameOver = true;
-          channel.publish(`pong-over-${gameId}`, { winner: w });
-        }
-
-        // Sync ball to guest
-        syncCounter++;
-        if (syncCounter % 3 === 0) {
-          channel.publish(`pong-ball-${gameId}`, {
-            ballX: s.ballX,
-            ballY: s.ballY,
-            p1Y: s.p1Y,
-            score1: s.score1,
-            score2: s.score2,
-          });
+          // Sync ball to guest every 2 frames
+          syncCounter++;
+          if (syncCounter % 2 === 0) {
+            channel.publish(`pong-ball-${gameId}`, {
+              ballX: s.ballX,
+              ballY: s.ballY,
+              ballVX: s.ballVX,
+              ballVY: s.ballVY,
+              p1Y: s.p1Y,
+              p2Y: s.p2Y,
+              score1: s.score1,
+              score2: s.score2,
+            });
+          }
+        } else {
+          // Guest: interpolate ball locally between sync messages
+          s.ballX += s.ballVX;
+          s.ballY += s.ballVY;
+          // Clamp ball to canvas
+          if (s.ballY - BALL_R <= 0 || s.ballY + BALL_R >= CANVAS_H) {
+            s.ballVY = -s.ballVY;
+          }
         }
       }
 
@@ -334,7 +401,6 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
   }
 
   function drawState(ctx: CanvasRenderingContext2D, s: typeof stateRef.current) {
-    // Background
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
@@ -366,6 +432,14 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
     ctx.textAlign = "center";
     ctx.fillText(String(s.score1), CANVAS_W / 4, 40);
     ctx.fillText(String(s.score2), (CANVAS_W * 3) / 4, 40);
+
+    // Waiting message
+    if (!s.started && !s.gameOver) {
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "bold 18px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Aguardando oponente...", CANVAS_W / 2, CANVAS_H / 2);
+    }
   }
 
   return (
@@ -377,7 +451,7 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
             🏓 {isHost ? nickname : opponent} vs {isHost ? opponent : nickname}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Use ↑↓ ou toque/arraste para mover. Primeiro a {WIN_SCORE} pontos vence!
+            💻 PC: ↑↓ ou W/S para mover | 📱 Celular: toque e arraste na tela | Primeiro a {WIN_SCORE} vence!
           </DialogDescription>
         </DialogHeader>
 
@@ -395,6 +469,9 @@ export function PongGameCanvas({ channel, gameId, nickname, opponent, isHost, on
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerEvent}
           />
+          {waitingStart && (
+            <p className="text-sm text-muted-foreground animate-pulse">Conectando jogadores...</p>
+          )}
           {winner && (
             <div className="text-center animate-scale-in">
               <p className="text-xl font-bold text-primary">
