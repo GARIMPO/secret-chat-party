@@ -400,6 +400,19 @@ export default function ChatPage() {
         setShowConfetti(true);
       }
     });
+    channel.subscribe("ast-invite", (msg: Ably.Message) => {
+      const data = msg.data as AsteroidsInvite;
+      if (data.to === nicknameRef.current) {
+        setPendingAsteroidsInvite(data);
+      }
+    });
+    channel.subscribe("ast-accept", (msg: Ably.Message) => {
+      const data = msg.data as { gameId: string; host: string; guest: string };
+      if (data.host === nicknameRef.current || data.guest === nicknameRef.current) {
+        setActiveAsteroidsGame(data);
+        setPendingAsteroidsInvite(null);
+      }
+    });
   }, [room]);
 
   // Auto-rejoin from saved session
