@@ -835,6 +835,25 @@ export default function ChatPage() {
     channelRef.current?.publish("guess-result", result);
   };
 
+  const handleAsteroidsInvite = (target: string) => {
+    if (!channelRef.current) return;
+    const invite: AsteroidsInvite = { gameId: crypto.randomUUID(), from: nickname, to: target };
+    channelRef.current.publish("ast-invite", invite);
+    toast.info(`Convite enviado para ${target}!`);
+  };
+
+  const handleAsteroidsAccept = () => {
+    if (!pendingAsteroidsInvite || !channelRef.current) return;
+    const gameState: AsteroidsGameState = {
+      gameId: pendingAsteroidsInvite.gameId,
+      host: pendingAsteroidsInvite.from,
+      guest: pendingAsteroidsInvite.to,
+    };
+    channelRef.current.publish("ast-accept", gameState);
+    setActiveAsteroidsGame(gameState);
+    setPendingAsteroidsInvite(null);
+  };
+
   const handleYouTubeTimeUpdate = (time: number) => {
     setYtVideo(prev => {
       const updated = { ...prev, currentTime: time };
