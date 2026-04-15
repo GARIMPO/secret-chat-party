@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Rocket } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle } from "lucide-react";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -34,13 +34,6 @@ import {
   type GuessGameResult,
 } from "@/components/chat/ImageGuessGame";
 import parchmentBg from "@/assets/parchment.png";
-import {
-  AsteroidsInviteChooser,
-  AsteroidsInvitePopup,
-  AsteroidsGameCanvas,
-  type AsteroidsInvite,
-  type AsteroidsGameState,
-} from "@/components/chat/AsteroidsGame";
 import {
   Dialog,
   DialogContent,
@@ -217,9 +210,6 @@ export default function ChatPage() {
   const [showGuessGame, setShowGuessGame] = useState(false);
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showAsteroidsInvite, setShowAsteroidsInvite] = useState(false);
-  const [pendingAsteroidsInvite, setPendingAsteroidsInvite] = useState<AsteroidsInvite | null>(null);
-  const [activeAsteroidsGame, setActiveAsteroidsGame] = useState<AsteroidsGameState | null>(null);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -398,19 +388,6 @@ export default function ChatPage() {
       }]);
       if (data.correct) {
         setShowConfetti(true);
-      }
-    });
-    channel.subscribe("ast-invite", (msg: Ably.Message) => {
-      const data = msg.data as AsteroidsInvite;
-      if (data.to === nicknameRef.current) {
-        setPendingAsteroidsInvite(data);
-      }
-    });
-    channel.subscribe("ast-accept", (msg: Ably.Message) => {
-      const data = msg.data as { gameId: string; host: string; guest: string };
-      if (data.host === nicknameRef.current || data.guest === nicknameRef.current) {
-        setActiveAsteroidsGame(data);
-        setPendingAsteroidsInvite(null);
       }
     });
   }, [room]);
@@ -835,24 +812,6 @@ export default function ChatPage() {
     channelRef.current?.publish("guess-result", result);
   };
 
-  const handleAsteroidsInvite = (target: string) => {
-    if (!channelRef.current) return;
-    const invite: AsteroidsInvite = { gameId: crypto.randomUUID(), from: nickname, to: target };
-    channelRef.current.publish("ast-invite", invite);
-    toast.info(`Convite enviado para ${target}!`);
-  };
-
-  const handleAsteroidsAccept = () => {
-    if (!pendingAsteroidsInvite || !channelRef.current) return;
-    const gameState: AsteroidsGameState = {
-      gameId: pendingAsteroidsInvite.gameId,
-      host: pendingAsteroidsInvite.from,
-      guest: pendingAsteroidsInvite.to,
-    };
-    channelRef.current.publish("ast-accept", gameState);
-    setActiveAsteroidsGame(gameState);
-    setPendingAsteroidsInvite(null);
-  };
 
   const handleYouTubeTimeUpdate = (time: number) => {
     setYtVideo(prev => {
@@ -1462,16 +1421,6 @@ export default function ChatPage() {
           >
             <Puzzle className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAsteroidsInvite(true)}
-            title="Asteroides"
-            className="h-8 w-8 p-0"
-          >
-            <Rocket className="h-3.5 w-3.5" />
-          </Button>
           <div className="relative">
             <Button
               type="button"
@@ -1640,30 +1589,6 @@ export default function ChatPage() {
 
       {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
 
-      <AsteroidsInviteChooser
-        open={showAsteroidsInvite}
-        onClose={() => setShowAsteroidsInvite(false)}
-        onlineUsers={onlineUsers}
-        nickname={nickname}
-        onInvite={handleAsteroidsInvite}
-      />
-
-      {pendingAsteroidsInvite && (
-        <AsteroidsInvitePopup
-          invite={pendingAsteroidsInvite}
-          onAccept={handleAsteroidsAccept}
-          onDecline={() => setPendingAsteroidsInvite(null)}
-        />
-      )}
-
-      {activeAsteroidsGame && (
-        <AsteroidsGameCanvas
-          game={activeAsteroidsGame}
-          nickname={nickname}
-          channel={channelRef.current}
-          onClose={() => setActiveAsteroidsGame(null)}
-        />
-      )}
 
     </div>
   );
