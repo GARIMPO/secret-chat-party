@@ -405,6 +405,33 @@ export default function ChatPage() {
         setShowConfetti(true);
       }
     });
+    // Ping Pong invitation/acceptance
+    channel.subscribe("pong-invite", (msg: Ably.Message) => {
+      const data = msg.data as PongInvite;
+      if (data.to !== nicknameRef.current) return;
+      setPendingPongInvite(data);
+    });
+    channel.subscribe("pong-accept", (msg: Ably.Message) => {
+      const data = msg.data as PongAccept;
+      if (!data.accepted) {
+        if (data.to === nicknameRef.current) {
+          toast.error(`${data.from} recusou seu convite de Ping Pong.`);
+        }
+        return;
+      }
+      // Inviter starts the match (host = original sender = data.to here = inviter)
+      // Both sides open the canvas; data.to = inviter (host), data.from = invitee (guest)
+      if (
+        nicknameRef.current === data.to ||
+        nicknameRef.current === data.from
+      ) {
+        setActivePongMatch({
+          matchId: data.matchId,
+          host: data.to,
+          guest: data.from,
+        });
+      }
+    });
   }, [room]);
 
   // Auto-rejoin from saved session
