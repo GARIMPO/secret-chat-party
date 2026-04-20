@@ -13,7 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2 } from "lucide-react";
+import {
+  PongInviteChooser,
+  PongInvitePopup,
+  PongGameCanvas,
+  type PongInvite,
+  type PongAccept,
+} from "@/components/chat/PingPongGame";
 import { toast } from "sonner";
 import type Ably from "ably";
 import GifPicker from "@/components/chat/GifPicker";
@@ -211,6 +218,14 @@ export default function ChatPage() {
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
+  // Ping Pong
+  const [showPongInvite, setShowPongInvite] = useState(false);
+  const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
+  const [activePongMatch, setActivePongMatch] = useState<{
+    matchId: string;
+    host: string;
+    guest: string;
+  } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
@@ -388,6 +403,33 @@ export default function ChatPage() {
       }]);
       if (data.correct) {
         setShowConfetti(true);
+      }
+    });
+    // Ping Pong invitation/acceptance
+    channel.subscribe("pong-invite", (msg: Ably.Message) => {
+      const data = msg.data as PongInvite;
+      if (data.to !== nicknameRef.current) return;
+      setPendingPongInvite(data);
+    });
+    channel.subscribe("pong-accept", (msg: Ably.Message) => {
+      const data = msg.data as PongAccept;
+      if (!data.accepted) {
+        if (data.to === nicknameRef.current) {
+          toast.error(`${data.from} recusou seu convite de Ping Pong.`);
+        }
+        return;
+      }
+      // Inviter starts the match (host = original sender = data.to here = inviter)
+      // Both sides open the canvas; data.to = inviter (host), data.from = invitee (guest)
+      if (
+        nicknameRef.current === data.to ||
+        nicknameRef.current === data.from
+      ) {
+        setActivePongMatch({
+          matchId: data.matchId,
+          host: data.to,
+          guest: data.from,
+        });
       }
     });
   }, [room]);
@@ -789,6 +831,51 @@ export default function ChatPage() {
     if (room) localStorage.removeItem(`yt-state-${room}`);
     channelRef.current?.publish("youtube", evt);
     setShowYouTubeInput(false);
+  };
+
+  // ===== Ping Pong handlers =====
+  const handleSendPongInvite = (target: string) => {
+    if (!channelRef.current) return;
+    const matchId = crypto.randomUUID();
+    const invite: PongInvite = {
+      id: crypto.randomUUID(),
+      from: nickname,
+      to: target,
+      matchId,
+    };
+    channelRef.current.publish("pong-invite", invite);
+    toast.success(`Convite de Ping Pong enviado para ${target}`);
+  };
+
+  const handleAcceptPongInvite = () => {
+    if (!pendingPongInvite || !channelRef.current) return;
+    const accept: PongAccept = {
+      matchId: pendingPongInvite.matchId,
+      from: nickname, // invitee = guest
+      to: pendingPongInvite.from, // inviter = host
+      accepted: true,
+    };
+    channelRef.current.publish("pong-accept", accept);
+    setActivePongMatch({
+      matchId: pendingPongInvite.matchId,
+      host: pendingPongInvite.from,
+      guest: nickname,
+    });
+    setPendingPongInvite(null);
+  };
+
+  const handleDeclinePongInvite = () => {
+    if (!pendingPongInvite || !channelRef.current) {
+      setPendingPongInvite(null);
+      return;
+    }
+    channelRef.current.publish("pong-accept", {
+      matchId: pendingPongInvite.matchId,
+      from: nickname,
+      to: pendingPongInvite.from,
+      accepted: false,
+    } as PongAccept);
+    setPendingPongInvite(null);
   };
 
   const handleYouTubeSeek = (time: number) => {
@@ -1421,6 +1508,16 @@ export default function ChatPage() {
           >
             <Puzzle className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPongInvite(true)}
+            title="Ping Pong Multiplayer"
+            className="h-8 w-8 p-0"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" />
+          </Button>
           <div className="relative">
             <Button
               type="button"
@@ -1589,6 +1686,34 @@ export default function ChatPage() {
 
       {showConfetti && <ConfettiOverlay onDone={() => setShowConfetti(false)} />}
 
+      {/* Ping Pong: invite chooser */}
+      <PongInviteChooser
+        open={showPongInvite}
+        onClose={() => setShowPongInvite(false)}
+        onlineUsers={onlineUsers}
+        myNickname={nickname}
+        onSendInvite={handleSendPongInvite}
+      />
+
+      {/* Ping Pong: incoming invite popup */}
+      <PongInvitePopup
+        invite={pendingPongInvite}
+        onAccept={handleAcceptPongInvite}
+        onDecline={handleDeclinePongInvite}
+      />
+
+      {/* Ping Pong: active match canvas */}
+      {activePongMatch && (
+        <PongGameCanvas
+          open={!!activePongMatch}
+          matchId={activePongMatch.matchId}
+          channel={channelRef.current}
+          myNickname={nickname}
+          hostNickname={activePongMatch.host}
+          guestNickname={activePongMatch.guest}
+          onClose={() => setActivePongMatch(null)}
+        />
+      )}
 
     </div>
   );
