@@ -1508,11 +1508,16 @@ export default function ChatPage() {
           >
             <Puzzle className="h-3.5 w-3.5" />
           </Button>
-          <div className="relative">
-            <Button
-              type="button"
-              variant={translateLang ? "secondary" : "outline"}
-              size="sm"
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPongInvite(true)}
+            title="Ping Pong Multiplayer"
+            className="h-8 w-8 p-0"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" />
+          </Button>
               onClick={() => setShowTranslateMenu(!showTranslateMenu)}
               title="Traduzir"
               className="h-8 gap-1 px-2"
