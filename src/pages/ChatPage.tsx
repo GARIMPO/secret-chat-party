@@ -833,7 +833,51 @@ export default function ChatPage() {
     setShowYouTubeInput(false);
   };
 
-  const handleYouTubeSeek = (time: number) => {
+  // ===== Ping Pong handlers =====
+  const handleSendPongInvite = (target: string) => {
+    if (!channelRef.current) return;
+    const matchId = crypto.randomUUID();
+    const invite: PongInvite = {
+      id: crypto.randomUUID(),
+      from: nickname,
+      to: target,
+      matchId,
+    };
+    channelRef.current.publish("pong-invite", invite);
+    toast.success(`Convite de Ping Pong enviado para ${target}`);
+  };
+
+  const handleAcceptPongInvite = () => {
+    if (!pendingPongInvite || !channelRef.current) return;
+    const accept: PongAccept = {
+      matchId: pendingPongInvite.matchId,
+      from: nickname, // invitee = guest
+      to: pendingPongInvite.from, // inviter = host
+      accepted: true,
+    };
+    channelRef.current.publish("pong-accept", accept);
+    setActivePongMatch({
+      matchId: pendingPongInvite.matchId,
+      host: pendingPongInvite.from,
+      guest: nickname,
+    });
+    setPendingPongInvite(null);
+  };
+
+  const handleDeclinePongInvite = () => {
+    if (!pendingPongInvite || !channelRef.current) {
+      setPendingPongInvite(null);
+      return;
+    }
+    channelRef.current.publish("pong-accept", {
+      matchId: pendingPongInvite.matchId,
+      from: nickname,
+      to: pendingPongInvite.from,
+      accepted: false,
+    } as PongAccept);
+    setPendingPongInvite(null);
+  };
+
     const evt: YouTubeEvent = { ...ytVideo, currentTime: time };
     setYtVideo(evt);
     if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
