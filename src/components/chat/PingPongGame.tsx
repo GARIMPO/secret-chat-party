@@ -24,8 +24,69 @@ const BALL_SIZE = 10;
 const WIN_SCORE = 20;
 const BALL_SYNC_MS = 30;
 const PADDLE_SYNC_MS = 30;
-const LERP_FACTOR = 0.25; // 0..1 — quanto maior, mais rápido converge
+const BASE_BALL_SPEED_X = 240;
+const BASE_BALL_SPEED_Y = 180;
+const SPEED_STEP = 30;
+const MAX_BALL_SPEED = 720;
+const PADDLE_SPEED = 360;
+const BASE_LERP_FACTOR = 0.14;
+const MAX_LERP_FACTOR = 0.4;
+const CORRECTION_DISTANCE = 96;
 const TRAIL_LENGTH = 8;
+const MAX_BOUNCE_ANGLE = Math.PI / 3;
+
+type BallState = {
+  ballX: number;
+  ballY: number;
+  vX: number;
+  vY: number;
+};
+
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+const getInitialVelocity = () => ({
+  vX: BASE_BALL_SPEED_X * (Math.random() > 0.5 ? 1 : -1),
+  vY: BASE_BALL_SPEED_Y * (Math.random() > 0.5 ? 1 : -1),
+});
+
+const applyVerticalBounce = (state: Pick<BallState, "ballY" | "vY">) => {
+  const maxY = CANV_HEIGHT - BALL_SIZE;
+  while (state.ballY < 0 || state.ballY > maxY) {
+    if (state.ballY < 0) {
+      state.ballY = -state.ballY;
+      state.vY = Math.abs(state.vY);
+    } else {
+      state.ballY = maxY - (state.ballY - maxY);
+      state.vY = -Math.abs(state.vY);
+    }
+  }
+};
+
+const advanceBall = (state: BallState, deltaSeconds: number) => {
+  state.ballX += state.vX * deltaSeconds;
+  state.ballY += state.vY * deltaSeconds;
+  applyVerticalBounce(state);
+};
+
+const getBounceVelocity = (state: BallState, paddleY: number, direction: 1 | -1) => {
+  const impact = clampNumber(
+    (state.ballY + BALL_SIZE / 2 - (paddleY + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2),
+    -1,
+    1,
+  );
+  const nextSpeed = clampNumber(
+    Math.hypot(state.vX, state.vY) + SPEED_STEP,
+    Math.hypot(BASE_BALL_SPEED_X, BASE_BALL_SPEED_Y),
+    MAX_BALL_SPEED,
+  );
+  const angle = impact * MAX_BOUNCE_ANGLE;
+
+  return {
+    vX: Math.cos(angle) * nextSpeed * direction,
+    vY: Math.sin(angle) * nextSpeed,
+  };
+};
 
 export interface PongInvite {
   id: string;
@@ -184,8 +245,7 @@ export function PongGameCanvas({
   // Reset on open
   useEffect(() => {
     if (!open) return;
-    const initVx = 4 * (Math.random() > 0.5 ? 1 : -1);
-    const initVy = 3 * (Math.random() > 0.5 ? 1 : -1);
+    const { vX: initVx, vY: initVy } = getInitialVelocity();
     stateRef.current = {
       p1Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
       p2Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
@@ -199,7 +259,7 @@ export function PongGameCanvas({
       ballY: CANV_HEIGHT / 2,
       vX: initVx,
       vY: initVy,
-      lastRecvTs: performance.now(),
+      lastRecvTs: 0,
     };
     trailRef.current = [];
     setScore({ p1: 0, p2: 0 });
@@ -225,15 +285,19 @@ export function PongGameCanvas({
       };
       if (d.m !== matchId) return;
       if (isHost) return; // host é autoritativo
+      const isFirstPacket = targetRef.current.lastRecvTs === 0;
       // Atualiza alvo para LERP + velocidade para predição
       targetRef.current.ballX = d.x;
       targetRef.current.ballY = d.y;
       targetRef.current.vX = d.vx;
       targetRef.current.vY = d.vy;
       targetRef.current.lastRecvTs = performance.now();
-      // Velocidade local também acompanha (predição)
-      stateRef.current.vX = d.vx;
-      stateRef.current.vY = d.vy;
+      if (isFirstPacket) {
+        stateRef.current.ballX = d.x;
+        stateRef.current.ballY = d.y;
+        stateRef.current.vX = d.vx;
+        stateRef.current.vY = d.vy;
+      }
       // Placar é canônico do host
       if (d.p1 !== scoreRef.current.p1 || d.p2 !== scoreRef.current.p2) {
         scoreRef.current = { p1: d.p1, p2: d.p2 };
@@ -318,20 +382,22 @@ export function PongGameCanvas({
     let lastFrameTs = performance.now();
 
     const reset = (dir: number) => {
+      const { vY } = getInitialVelocity();
       stateRef.current.ballX = CANV_WIDTH / 2;
       stateRef.current.ballY = CANV_HEIGHT / 2;
-      stateRef.current.vX = 4 * dir;
-      stateRef.current.vY = 3 * (Math.random() > 0.5 ? 1 : -1);
+      stateRef.current.vX = BASE_BALL_SPEED_X * dir;
+      stateRef.current.vY = vY;
+      trailRef.current = [];
     };
 
     const loop = (ts: number) => {
       const s = stateRef.current;
-      const dt = Math.min(50, ts - lastFrameTs); // ms cap
+      const dt = Math.min(50, ts - lastFrameTs);
       lastFrameTs = ts;
-      const frameScale = dt / 16.667; // normaliza p/ ~60fps
+      const deltaSeconds = dt / 1000;
 
       // Controles próprios (raquete local)
-      const myKeySpeed = 6 * frameScale;
+      const myKeySpeed = PADDLE_SPEED * deltaSeconds;
       if (isHost) {
         if (keysRef.current.w) s.p1Y = Math.max(0, s.p1Y - myKeySpeed);
         if (keysRef.current.s) s.p1Y = Math.min(CANV_HEIGHT - PADDLE_HEIGHT, s.p1Y + myKeySpeed);
@@ -342,24 +408,21 @@ export function PongGameCanvas({
 
       // ===== HOST: física autoritativa =====
       if (isHost && guestReady && !winnerRef.current) {
-        s.ballX += s.vX * frameScale;
-        s.ballY += s.vY * frameScale;
-
-        if (s.ballY <= 0) { s.ballY = 0; s.vY *= -1; }
-        if (s.ballY >= CANV_HEIGHT - BALL_SIZE) { s.ballY = CANV_HEIGHT - BALL_SIZE; s.vY *= -1; }
+        advanceBall(s, deltaSeconds);
 
         let paddleHit = false;
         // P1 (left)
         if (
           s.ballX <= PADDLE_WIDTH &&
+          s.ballX + BALL_SIZE >= 0 &&
           s.ballY + BALL_SIZE >= s.p1Y &&
           s.ballY <= s.p1Y + PADDLE_HEIGHT &&
           s.vX < 0
         ) {
-          const newSpeed = Math.min(Math.abs(s.vX) + 0.5, 14);
-          s.vX = newSpeed;
-          const rel = (s.ballY - (s.p1Y + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
-          s.vY = rel * 5;
+          s.ballX = PADDLE_WIDTH;
+          const bounce = getBounceVelocity(s, s.p1Y, 1);
+          s.vX = bounce.vX;
+          s.vY = bounce.vY;
           paddleHit = true;
         }
         // P2 (right)
@@ -369,10 +432,10 @@ export function PongGameCanvas({
           s.ballY <= s.p2Y + PADDLE_HEIGHT &&
           s.vX > 0
         ) {
-          const newSpeed = Math.min(Math.abs(s.vX) + 0.5, 14);
-          s.vX = -newSpeed;
-          const rel = (s.ballY - (s.p2Y + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
-          s.vY = rel * 5;
+          s.ballX = CANV_WIDTH - PADDLE_WIDTH - BALL_SIZE;
+          const bounce = getBounceVelocity(s, s.p2Y, -1);
+          s.vX = bounce.vX;
+          s.vY = bounce.vY;
           paddleHit = true;
         }
 
@@ -423,18 +486,31 @@ export function PongGameCanvas({
 
       // ===== GUEST: predição + LERP =====
       if (!isHost && !winnerRef.current) {
+        advanceBall(s, deltaSeconds);
+
         const t = targetRef.current;
-        // Predição: avança o alvo pela velocidade conhecida
-        const sincePacket = ts - t.lastRecvTs;
-        const predFrames = sincePacket / 16.667;
-        const predX = t.ballX + t.vX * predFrames;
-        const predY = t.ballY + t.vY * predFrames;
-        // LERP suave em direção ao alvo predito
-        s.ballX += (predX - s.ballX) * LERP_FACTOR;
-        s.ballY += (predY - s.ballY) * LERP_FACTOR;
-        // Bordas top/bottom (visual)
-        if (s.ballY < 0) s.ballY = 0;
-        if (s.ballY > CANV_HEIGHT - BALL_SIZE) s.ballY = CANV_HEIGHT - BALL_SIZE;
+        if (t.lastRecvTs > 0) {
+          const predictedBall = {
+            ballX: t.ballX,
+            ballY: t.ballY,
+            vX: t.vX,
+            vY: t.vY,
+          };
+          advanceBall(predictedBall, Math.max(0, (ts - t.lastRecvTs) / 1000));
+
+          const diffX = predictedBall.ballX - s.ballX;
+          const diffY = predictedBall.ballY - s.ballY;
+          const distance = Math.hypot(diffX, diffY);
+          const lerpFactor =
+            BASE_LERP_FACTOR +
+            (MAX_LERP_FACTOR - BASE_LERP_FACTOR) * clampNumber(distance / CORRECTION_DISTANCE, 0, 1);
+
+          s.ballX += diffX * lerpFactor;
+          s.ballY += diffY * lerpFactor;
+          s.vX += (predictedBall.vX - s.vX) * Math.min(lerpFactor, 0.18);
+          s.vY += (predictedBall.vY - s.vY) * Math.min(lerpFactor, 0.18);
+          applyVerticalBounce(s);
+        }
       }
 
       // Trail
@@ -483,17 +559,18 @@ export function PongGameCanvas({
       ctx.fillRect(s.ballX, s.ballY, BALL_SIZE, BALL_SIZE);
 
       // Placar
+      const displayScore = scoreRef.current;
       ctx.fillStyle = "#FFF";
       ctx.font = "bold 36px monospace";
       ctx.textAlign = "center";
-      ctx.fillText(String(score.p1), CANV_WIDTH / 2 - 40, 44);
-      ctx.fillText(String(score.p2), CANV_WIDTH / 2 + 40, 44);
+      ctx.fillText(String(displayScore.p1), CANV_WIDTH / 2 - 40, 44);
+      ctx.fillText(String(displayScore.p2), CANV_WIDTH / 2 + 40, 44);
 
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [open, isHost, channel, matchId, score.p1, score.p2, role, guestReady, hostNickname, guestNickname]);
+  }, [open, isHost, channel, matchId, role, guestReady, hostNickname, guestNickname]);
 
   // Pointer (mouse + touch)
   const movePaddleTo = useCallback((clientY: number) => {
