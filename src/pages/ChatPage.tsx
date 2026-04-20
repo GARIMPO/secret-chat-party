@@ -218,6 +218,14 @@ export default function ChatPage() {
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
+  // Ping Pong
+  const [showPongInvite, setShowPongInvite] = useState(false);
+  const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
+  const [activePongMatch, setActivePongMatch] = useState<{
+    matchId: string;
+    host: string;
+    guest: string;
+  } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [ytVideo, setYtVideo] = useState<YouTubeEvent>(() => {
