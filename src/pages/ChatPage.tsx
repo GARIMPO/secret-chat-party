@@ -878,6 +878,7 @@ export default function ChatPage() {
     setPendingPongInvite(null);
   };
 
+  const handleYouTubeSeek = (time: number) => {
     const evt: YouTubeEvent = { ...ytVideo, currentTime: time };
     setYtVideo(evt);
     if (room) localStorage.setItem(`yt-state-${room}`, JSON.stringify(evt));
