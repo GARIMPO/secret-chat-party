@@ -6,17 +6,14 @@ import { Gamepad2, X } from "lucide-react";
 import { toast } from "sonner";
 
 /**
- * Multiplayer Ping Pong (Atari-style) integrated with Ably.
+ * Multiplayer Ping Pong (Atari-style) com Ably.
  *
- * Flow:
- *  - User picks an opponent from online users → publishes "pong-invite".
- *  - Opponent receives popup → accepts → publishes "pong-accept".
- *  - Both open the game canvas. The inviter is HOST, the invitee is GUEST.
- *  - HOST runs physics + broadcasts ball state. Both broadcast paddle Y.
- *
- * Controls:
- *  - Desktop: mouse move over canvas, or W/S keys.
- *  - Mobile: touch/drag on canvas.
+ * Sincronização otimizada:
+ *  - Host envia estado da bola a 33Hz (cada 30ms): [x, y, vX, vY, p1, p2, t].
+ *  - Guest aplica LERP (interpolação) entre posição atual e a recebida.
+ *  - Guest faz predição (dead reckoning) usando vX/vY entre pacotes.
+ *  - Eventos críticos (ponto, vitória) são publicados imediatamente.
+ *  - Rastro visual da bola (trail) suaviza percepção de jitter.
  */
 
 const CANV_WIDTH = 600;
@@ -24,7 +21,11 @@ const CANV_HEIGHT = 360;
 const PADDLE_WIDTH = 10;
 const PADDLE_HEIGHT = 70;
 const BALL_SIZE = 10;
-const WIN_SCORE = 7;
+const WIN_SCORE = 20;
+const BALL_SYNC_MS = 30;
+const PADDLE_SYNC_MS = 30;
+const LERP_FACTOR = 0.25; // 0..1 — quanto maior, mais rápido converge
+const TRAIL_LENGTH = 8;
 
 export interface PongInvite {
   id: string;
@@ -129,13 +130,6 @@ export function PongInvitePopup({
 
 // ===================== GAME CANVAS =====================
 
-interface BallState {
-  x: number;
-  y: number;
-  scoreP1: number;
-  scoreP2: number;
-}
-
 export function PongGameCanvas({
   open,
   matchId,
@@ -161,6 +155,7 @@ export function PongGameCanvas({
   const [winner, setWinner] = useState<string | null>(null);
   const [guestReady, setGuestReady] = useState(false);
 
+  // Estado autoritativo (host) ou local renderizado (guest)
   const stateRef = useRef({
     p1Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
     p2Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
@@ -169,21 +164,46 @@ export function PongGameCanvas({
     vX: 4,
     vY: 3,
   });
+
+  // Alvo recebido do host (para LERP no guest)
+  const targetRef = useRef({
+    ballX: CANV_WIDTH / 2,
+    ballY: CANV_HEIGHT / 2,
+    vX: 4,
+    vY: 3,
+    lastRecvTs: 0, // performance.now()
+  });
+
+  // Trail da bola
+  const trailRef = useRef<Array<{ x: number; y: number }>>([]);
+
   const keysRef = useRef<{ w: boolean; s: boolean }>({ w: false, s: false });
   const winnerRef = useRef<string | null>(null);
+  const scoreRef = useRef({ p1: 0, p2: 0 });
 
   // Reset on open
   useEffect(() => {
     if (!open) return;
+    const initVx = 4 * (Math.random() > 0.5 ? 1 : -1);
+    const initVy = 3 * (Math.random() > 0.5 ? 1 : -1);
     stateRef.current = {
       p1Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
       p2Y: CANV_HEIGHT / 2 - PADDLE_HEIGHT / 2,
       ballX: CANV_WIDTH / 2,
       ballY: CANV_HEIGHT / 2,
-      vX: 4 * (Math.random() > 0.5 ? 1 : -1),
-      vY: 3 * (Math.random() > 0.5 ? 1 : -1),
+      vX: initVx,
+      vY: initVy,
     };
+    targetRef.current = {
+      ballX: CANV_WIDTH / 2,
+      ballY: CANV_HEIGHT / 2,
+      vX: initVx,
+      vY: initVy,
+      lastRecvTs: performance.now(),
+    };
+    trailRef.current = [];
     setScore({ p1: 0, p2: 0 });
+    scoreRef.current = { p1: 0, p2: 0 };
     setWinner(null);
     winnerRef.current = null;
     setGuestReady(false);
@@ -194,23 +214,49 @@ export function PongGameCanvas({
     if (!open || !channel) return;
 
     const onBall = (msg: Ably.Message) => {
-      const data = msg.data as BallState & { matchId: string };
-      if (data.matchId !== matchId) return;
-      if (isHost) return; // host is authoritative
-      stateRef.current.ballX = data.x;
-      stateRef.current.ballY = data.y;
-      setScore({ p1: data.scoreP1, p2: data.scoreP2 });
+      const d = msg.data as {
+        m: string;
+        x: number;
+        y: number;
+        vx: number;
+        vy: number;
+        p1: number;
+        p2: number;
+      };
+      if (d.m !== matchId) return;
+      if (isHost) return; // host é autoritativo
+      // Atualiza alvo para LERP + velocidade para predição
+      targetRef.current.ballX = d.x;
+      targetRef.current.ballY = d.y;
+      targetRef.current.vX = d.vx;
+      targetRef.current.vY = d.vy;
+      targetRef.current.lastRecvTs = performance.now();
+      // Velocidade local também acompanha (predição)
+      stateRef.current.vX = d.vx;
+      stateRef.current.vY = d.vy;
+      // Placar é canônico do host
+      if (d.p1 !== scoreRef.current.p1 || d.p2 !== scoreRef.current.p2) {
+        scoreRef.current = { p1: d.p1, p2: d.p2 };
+        setScore({ p1: d.p1, p2: d.p2 });
+      }
     };
     const onPaddle = (msg: Ably.Message) => {
-      const data = msg.data as { y: number; role: "host" | "guest"; matchId: string };
-      if (data.matchId !== matchId) return;
-      if (data.role === "host" && !isHost) stateRef.current.p1Y = data.y;
-      if (data.role === "guest" && isHost) stateRef.current.p2Y = data.y;
+      const data = msg.data as { y: number; r: "host" | "guest"; m: string };
+      if (data.m !== matchId) return;
+      if (data.r === "host" && !isHost) stateRef.current.p1Y = data.y;
+      if (data.r === "guest" && isHost) stateRef.current.p2Y = data.y;
     };
     const onReady = (msg: Ably.Message) => {
       const data = msg.data as { matchId: string; role: string };
       if (data.matchId !== matchId) return;
       if (data.role === "guest") setGuestReady(true);
+    };
+    const onScore = (msg: Ably.Message) => {
+      const d = msg.data as { m: string; p1: number; p2: number };
+      if (d.m !== matchId) return;
+      if (isHost) return;
+      scoreRef.current = { p1: d.p1, p2: d.p2 };
+      setScore({ p1: d.p1, p2: d.p2 });
     };
     const onWin = (msg: Ably.Message) => {
       const data = msg.data as { matchId: string; winner: string };
@@ -222,21 +268,22 @@ export function PongGameCanvas({
     channel.subscribe("pong-ball", onBall);
     channel.subscribe("pong-paddle", onPaddle);
     channel.subscribe("pong-ready", onReady);
+    channel.subscribe("pong-score", onScore);
     channel.subscribe("pong-win", onWin);
 
-    // Announce readiness
     channel.publish("pong-ready", { matchId, role });
-    if (isHost) setGuestReady(false); // wait for guest
+    if (isHost) setGuestReady(false);
 
     return () => {
       channel.unsubscribe("pong-ball", onBall);
       channel.unsubscribe("pong-paddle", onPaddle);
       channel.unsubscribe("pong-ready", onReady);
+      channel.unsubscribe("pong-score", onScore);
       channel.unsubscribe("pong-win", onWin);
     };
   }, [open, channel, matchId, isHost, role]);
 
-  // Keyboard controls
+  // Keyboard
   useEffect(() => {
     if (!open) return;
     const onDown = (e: KeyboardEvent) => {
@@ -257,7 +304,7 @@ export function PongGameCanvas({
     };
   }, [open]);
 
-  // Game loop
+  // Game loop — independente do recebimento de mensagens
   useEffect(() => {
     if (!open) return;
     const canvas = canvasRef.current;
@@ -266,7 +313,9 @@ export function PongGameCanvas({
     if (!ctx) return;
 
     let raf = 0;
-    let lastSync = 0;
+    let lastBallSync = 0;
+    let lastPaddleSync = 0;
+    let lastFrameTs = performance.now();
 
     const reset = (dir: number) => {
       stateRef.current.ballX = CANV_WIDTH / 2;
@@ -277,9 +326,12 @@ export function PongGameCanvas({
 
     const loop = (ts: number) => {
       const s = stateRef.current;
+      const dt = Math.min(50, ts - lastFrameTs); // ms cap
+      lastFrameTs = ts;
+      const frameScale = dt / 16.667; // normaliza p/ ~60fps
 
-      // Apply keyboard for own paddle
-      const myKeySpeed = 6;
+      // Controles próprios (raquete local)
+      const myKeySpeed = 6 * frameScale;
       if (isHost) {
         if (keysRef.current.w) s.p1Y = Math.max(0, s.p1Y - myKeySpeed);
         if (keysRef.current.s) s.p1Y = Math.min(CANV_HEIGHT - PADDLE_HEIGHT, s.p1Y + myKeySpeed);
@@ -288,15 +340,16 @@ export function PongGameCanvas({
         if (keysRef.current.s) s.p2Y = Math.min(CANV_HEIGHT - PADDLE_HEIGHT, s.p2Y + myKeySpeed);
       }
 
-      // Host physics
+      // ===== HOST: física autoritativa =====
       if (isHost && guestReady && !winnerRef.current) {
-        s.ballX += s.vX;
-        s.ballY += s.vY;
+        s.ballX += s.vX * frameScale;
+        s.ballY += s.vY * frameScale;
 
         if (s.ballY <= 0) { s.ballY = 0; s.vY *= -1; }
         if (s.ballY >= CANV_HEIGHT - BALL_SIZE) { s.ballY = CANV_HEIGHT - BALL_SIZE; s.vY *= -1; }
 
-        // P1 paddle (left)
+        let paddleHit = false;
+        // P1 (left)
         if (
           s.ballX <= PADDLE_WIDTH &&
           s.ballY + BALL_SIZE >= s.p1Y &&
@@ -307,8 +360,9 @@ export function PongGameCanvas({
           s.vX = newSpeed;
           const rel = (s.ballY - (s.p1Y + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
           s.vY = rel * 5;
+          paddleHit = true;
         }
-        // P2 paddle (right)
+        // P2 (right)
         if (
           s.ballX + BALL_SIZE >= CANV_WIDTH - PADDLE_WIDTH &&
           s.ballY + BALL_SIZE >= s.p2Y &&
@@ -319,22 +373,27 @@ export function PongGameCanvas({
           s.vX = -newSpeed;
           const rel = (s.ballY - (s.p2Y + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
           s.vY = rel * 5;
+          paddleHit = true;
         }
 
-        // Scoring
+        // Ponto
         let scored = false;
-        let p1 = score.p1, p2 = score.p2;
+        let { p1, p2 } = scoreRef.current;
         if (s.ballX < -BALL_SIZE) {
-          p2 += 1;
-          scored = true;
-          reset(1);
+          p2 += 1; scored = true; reset(1);
         } else if (s.ballX > CANV_WIDTH) {
-          p1 += 1;
-          scored = true;
-          reset(-1);
+          p1 += 1; scored = true; reset(-1);
         }
         if (scored) {
+          scoreRef.current = { p1, p2 };
           setScore({ p1, p2 });
+          // Evento crítico — envio imediato
+          channel?.publish("pong-score", { m: matchId, p1, p2 });
+          // Snapshot imediato da bola (reset)
+          channel?.publish("pong-ball", {
+            m: matchId, x: s.ballX, y: s.ballY, vx: s.vX, vy: s.vY, p1, p2,
+          });
+          lastBallSync = ts;
           if (p1 >= WIN_SCORE || p2 >= WIN_SCORE) {
             const w = p1 >= WIN_SCORE ? hostNickname : guestNickname;
             winnerRef.current = w;
@@ -343,34 +402,60 @@ export function PongGameCanvas({
           }
         }
 
-        // Broadcast ball state ~30fps
-        if (ts - lastSync > 33) {
-          lastSync = ts;
+        // Snapshot imediato em rebatida (evita placar/trajetória dessincronizada)
+        if (paddleHit) {
           channel?.publish("pong-ball", {
-            matchId,
-            x: s.ballX,
-            y: s.ballY,
-            scoreP1: p1,
-            scoreP2: p2,
+            m: matchId, x: s.ballX, y: s.ballY, vx: s.vX, vy: s.vY,
+            p1: scoreRef.current.p1, p2: scoreRef.current.p2,
+          });
+          lastBallSync = ts;
+        }
+
+        // Throttle 30ms (~33Hz)
+        if (ts - lastBallSync >= BALL_SYNC_MS) {
+          lastBallSync = ts;
+          channel?.publish("pong-ball", {
+            m: matchId, x: s.ballX, y: s.ballY, vx: s.vX, vy: s.vY,
+            p1: scoreRef.current.p1, p2: scoreRef.current.p2,
           });
         }
       }
 
-      // Always broadcast my paddle (throttled to ~30fps via timestamp)
-      if (ts - (loop as any)._lastPaddle > 33) {
-        (loop as any)._lastPaddle = ts;
+      // ===== GUEST: predição + LERP =====
+      if (!isHost && !winnerRef.current) {
+        const t = targetRef.current;
+        // Predição: avança o alvo pela velocidade conhecida
+        const sincePacket = ts - t.lastRecvTs;
+        const predFrames = sincePacket / 16.667;
+        const predX = t.ballX + t.vX * predFrames;
+        const predY = t.ballY + t.vY * predFrames;
+        // LERP suave em direção ao alvo predito
+        s.ballX += (predX - s.ballX) * LERP_FACTOR;
+        s.ballY += (predY - s.ballY) * LERP_FACTOR;
+        // Bordas top/bottom (visual)
+        if (s.ballY < 0) s.ballY = 0;
+        if (s.ballY > CANV_HEIGHT - BALL_SIZE) s.ballY = CANV_HEIGHT - BALL_SIZE;
+      }
+
+      // Trail
+      trailRef.current.push({ x: s.ballX, y: s.ballY });
+      if (trailRef.current.length > TRAIL_LENGTH) trailRef.current.shift();
+
+      // Envio de raquete (throttle 30ms)
+      if (ts - lastPaddleSync >= PADDLE_SYNC_MS) {
+        lastPaddleSync = ts;
         channel?.publish("pong-paddle", {
-          matchId,
-          role,
+          m: matchId,
+          r: role,
           y: isHost ? s.p1Y : s.p2Y,
         });
       }
 
-      // Draw
+      // ===== Draw =====
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, CANV_WIDTH, CANV_HEIGHT);
 
-      // Center dashed line
+      // Linha central
       ctx.strokeStyle = "#FFF";
       ctx.setLineDash([6, 10]);
       ctx.beginPath();
@@ -379,15 +464,25 @@ export function PongGameCanvas({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Paddles
+      // Raquetes
       ctx.fillStyle = "#FFF";
       ctx.fillRect(0, s.p1Y, PADDLE_WIDTH, PADDLE_HEIGHT);
       ctx.fillRect(CANV_WIDTH - PADDLE_WIDTH, s.p2Y, PADDLE_WIDTH, PADDLE_HEIGHT);
 
-      // Ball
+      // Trail (desenhado antes da bola, alpha crescente)
+      const trail = trailRef.current;
+      for (let i = 0; i < trail.length - 1; i++) {
+        const a = (i + 1) / trail.length;
+        ctx.fillStyle = `rgba(255,255,255,${a * 0.35})`;
+        const sz = BALL_SIZE * (0.5 + 0.5 * a);
+        ctx.fillRect(trail[i].x, trail[i].y, sz, sz);
+      }
+
+      // Bola
+      ctx.fillStyle = "#FFF";
       ctx.fillRect(s.ballX, s.ballY, BALL_SIZE, BALL_SIZE);
 
-      // Scores
+      // Placar
       ctx.fillStyle = "#FFF";
       ctx.font = "bold 36px monospace";
       ctx.textAlign = "center";
@@ -396,12 +491,11 @@ export function PongGameCanvas({
 
       raf = requestAnimationFrame(loop);
     };
-    (loop as any)._lastPaddle = 0;
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [open, isHost, channel, matchId, score.p1, score.p2, role, guestReady, hostNickname, guestNickname]);
 
-  // Pointer (mouse + touch) controls
+  // Pointer (mouse + touch)
   const movePaddleTo = useCallback((clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -470,7 +564,6 @@ export function PongGameCanvas({
   );
 }
 
-// Helper to show toast on send/accept
 export function notifyInviteSent(target: string) {
   toast.success(`Convite de Ping Pong enviado para ${target}`);
 }
