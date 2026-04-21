@@ -210,6 +210,12 @@ export default function ChatPage() {
   const [translateLang, setTranslateLang] = useState("");
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [chatTheme, setChatTheme] = useState<string>(() => {
+    if (typeof window === "undefined") return "default";
+    return localStorage.getItem("chat-theme") || "default";
+  });
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
@@ -1198,7 +1204,14 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
+    <div
+      className="flex h-[100dvh] flex-col bg-background transition-colors"
+      style={
+        chatTheme && chatTheme !== "default"
+          ? { background: chatTheme }
+          : undefined
+      }
+    >
       <EmotionOverlay emotion={emotion} />
 
       {showDrawing && (
