@@ -31,6 +31,8 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import ShareRoom from "@/components/chat/ShareRoom";
+import RoomThemePicker from "@/components/chat/RoomThemePicker";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -1350,6 +1352,8 @@ export default function ChatPage() {
               <SelectItem value="xxlarge">Enorme</SelectItem>
             </SelectContent>
           </Select>
+          <ShareRoom room={room} />
+          <RoomThemePicker room={room} />
           <Button variant="ghost" size="icon" onClick={() => setShowYouTubeInput(!showYouTubeInput)} title="YouTube" className="h-8 w-8">
             <Music className="h-4 w-4 text-primary" />
           </Button>
