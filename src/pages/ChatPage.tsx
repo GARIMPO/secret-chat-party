@@ -499,6 +499,8 @@ export default function ChatPage() {
       channel.publish("user-join", { nickname: session.nickname });
       setJoined(true);
       requestNotificationPermission();
+    }
+  }, [room]);
 
   useEffect(() => {
     if (!joined || !room) return;
