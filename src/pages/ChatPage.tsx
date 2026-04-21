@@ -3,6 +3,13 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { getAblyClient } from "@/lib/ably";
 import { encryptMessage, decryptMessage } from "@/lib/crypto";
 import { playBeep } from "@/lib/beep";
+import {
+  requestNotificationPermission,
+  showMessageNotification,
+  incrementBadge,
+  clearBadge,
+  isTabVisible,
+} from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -256,6 +263,20 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Clear badge/title counter when tab becomes visible
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") clearBadge();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      clearBadge();
+    };
+  }, []);
+
   const setupPresenceAndTyping = useCallback((channel: Ably.RealtimeChannel, myNick: string) => {
     // Presence for online users
     channel.presence.enter({ nickname: myNick });
@@ -288,7 +309,24 @@ export default function ChatPage() {
     channel.subscribe("message", (msg: Ably.Message) => {
       const data = msg.data as ChatMessage;
       updateMessages((prev) => [...prev, data]);
-      if (data.sender !== nicknameRef.current) playBeep();
+      if (data.sender !== nicknameRef.current) {
+        playBeep();
+        // Skip private messages addressed to others
+        if (!data.privateTo || data.privateTo === nicknameRef.current) {
+          if (!isTabVisible()) {
+            incrementBadge();
+            const preview = (() => {
+              try {
+                const text = decryptMessage(data.encrypted, ROOM_PASSWORD);
+                return text === data.encrypted ? "Nova mensagem" : text;
+              } catch {
+                return "Nova mensagem";
+              }
+            })();
+            showMessageNotification(`💬 ${data.sender}`, preview.slice(0, 120));
+          }
+        }
+      }
       // Clear typing for sender
       setTypingUsers((prev) => prev.filter((u) => u !== data.sender));
     });
