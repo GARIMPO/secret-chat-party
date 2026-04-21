@@ -498,8 +498,7 @@ export default function ChatPage() {
       setupPresenceAndTyping(channel, session.nickname);
       channel.publish("user-join", { nickname: session.nickname });
       setJoined(true);
-    }
-  }, [room]);
+      requestNotificationPermission();
 
   useEffect(() => {
     if (!joined || !room) return;
@@ -616,6 +615,7 @@ export default function ChatPage() {
     window.addEventListener("beforeunload", handleUnload);
 
     setJoined(true);
+    requestNotificationPermission();
   };
 
   const handleTyping = () => {
