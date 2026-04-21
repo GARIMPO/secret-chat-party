@@ -31,6 +31,8 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import ShareRoom from "@/components/chat/ShareRoom";
+import RoomThemePicker from "@/components/chat/RoomThemePicker";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
