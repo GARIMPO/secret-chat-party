@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2 } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check } from "lucide-react";
 import {
   PongInviteChooser,
   PongInvitePopup,
@@ -210,6 +210,12 @@ export default function ChatPage() {
   const [translateLang, setTranslateLang] = useState("");
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [chatTheme, setChatTheme] = useState<string>(() => {
+    if (typeof window === "undefined") return "default";
+    return localStorage.getItem("chat-theme") || "default";
+  });
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [externalUrl, setExternalUrl] = useState("");
   const [roomAdmins, setRoomAdmins] = useState<string[]>([]);
@@ -1198,7 +1204,14 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
+    <div
+      className="flex h-[100dvh] flex-col bg-background transition-colors"
+      style={
+        chatTheme && chatTheme !== "default"
+          ? { background: chatTheme }
+          : undefined
+      }
+    >
       <EmotionOverlay emotion={emotion} />
 
       {showDrawing && (
@@ -1552,6 +1565,71 @@ export default function ChatPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                const url = `${window.location.origin}/chat?room=${encodeURIComponent(room || "")}`;
+                await navigator.clipboard.writeText(url);
+                setUrlCopied(true);
+                toast.success("Link da sala copiado!");
+                setTimeout(() => setUrlCopied(false), 1500);
+              } catch {
+                toast.error("Não foi possível copiar o link");
+              }
+            }}
+            title="Copiar link da sala"
+            className="h-8 w-8 p-0"
+          >
+            {urlCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Link2 className="h-3.5 w-3.5" />}
+          </Button>
+          <div className="relative">
+            <Button
+              type="button"
+              variant={chatTheme !== "default" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowThemeMenu(!showThemeMenu)}
+              title="Tema da sala"
+              className="h-8 w-8 p-0"
+            >
+              <Palette className="h-3.5 w-3.5" />
+            </Button>
+            {showThemeMenu && (
+              <div className="absolute bottom-full mb-1 right-0 w-56 bg-popover border border-border rounded-lg shadow-lg p-3 z-50">
+                <p className="text-[10px] font-medium text-muted-foreground mb-2">Tema da sala</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: "default", label: "Padrão", bg: "" },
+                    { id: "linear-gradient(135deg, hsl(220 20% 97%), hsl(220 14% 92%))", label: "Claro", bg: "linear-gradient(135deg, hsl(220 20% 97%), hsl(220 14% 92%))" },
+                    { id: "linear-gradient(135deg, hsl(222 47% 11%), hsl(222 47% 6%))", label: "Escuro", bg: "linear-gradient(135deg, hsl(222 47% 11%), hsl(222 47% 6%))" },
+                    { id: "linear-gradient(135deg, hsl(160 60% 90%), hsl(160 50% 75%))", label: "Menta", bg: "linear-gradient(135deg, hsl(160 60% 90%), hsl(160 50% 75%))" },
+                    { id: "linear-gradient(135deg, hsl(280 60% 92%), hsl(260 60% 80%))", label: "Lavanda", bg: "linear-gradient(135deg, hsl(280 60% 92%), hsl(260 60% 80%))" },
+                    { id: "linear-gradient(135deg, hsl(30 90% 90%), hsl(15 85% 75%))", label: "Pôr do sol", bg: "linear-gradient(135deg, hsl(30 90% 90%), hsl(15 85% 75%))" },
+                    { id: "linear-gradient(135deg, hsl(210 80% 90%), hsl(220 70% 75%))", label: "Oceano", bg: "linear-gradient(135deg, hsl(210 80% 90%), hsl(220 70% 75%))" },
+                    { id: "linear-gradient(135deg, hsl(340 80% 92%), hsl(320 70% 80%))", label: "Rosé", bg: "linear-gradient(135deg, hsl(340 80% 92%), hsl(320 70% 80%))" },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setChatTheme(t.id);
+                        localStorage.setItem("chat-theme", t.id);
+                        setShowThemeMenu(false);
+                      }}
+                      title={t.label}
+                      className={`h-10 w-full rounded-md border-2 transition-all ${
+                        chatTheme === t.id ? "border-primary scale-105" : "border-border hover:border-muted-foreground"
+                      }`}
+                      style={t.bg ? { background: t.bg } : { background: "hsl(var(--background))" }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">Apenas para você</p>
               </div>
             )}
           </div>
