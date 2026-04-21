@@ -1352,6 +1352,8 @@ export default function ChatPage() {
               <SelectItem value="xxlarge">Enorme</SelectItem>
             </SelectContent>
           </Select>
+          <ShareRoom room={room} />
+          <RoomThemePicker room={room} />
           <Button variant="ghost" size="icon" onClick={() => setShowYouTubeInput(!showYouTubeInput)} title="YouTube" className="h-8 w-8">
             <Music className="h-4 w-4 text-primary" />
           </Button>
