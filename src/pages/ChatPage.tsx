@@ -1682,6 +1682,43 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+          <Popover open={showMinionPicker} onOpenChange={setShowMinionPicker}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Tocar alarme do Minion"
+                className="h-8 w-8 p-0"
+              >
+                <Siren className="h-3.5 w-3.5 text-yellow-500" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" side="top" align="end">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">
+                🚨 Tocar alarme para:
+              </p>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                {onlineUsers.filter((u) => u !== nickname).length === 0 && (
+                  <p className="text-xs text-muted-foreground px-1 py-2">Ninguém online</p>
+                )}
+                {onlineUsers.filter((u) => u !== nickname).map((user) => (
+                  <button
+                    key={user}
+                    type="button"
+                    onClick={() => {
+                      channelRef.current?.publish("minion-alarm", { from: nickname, to: user });
+                      toast.success(`🚨 Alarme enviado para ${user}!`);
+                      setShowMinionPicker(false);
+                    }}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors"
+                  >
+                    {user}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Private chat indicator */}
