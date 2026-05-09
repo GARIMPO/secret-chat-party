@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren } from "lucide-react";
 import {
   PongInviteChooser,
   PongInvitePopup,
@@ -38,6 +38,7 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import MinionAlarm from "@/components/chat/MinionAlarm";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -231,6 +232,9 @@ export default function ChatPage() {
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
+  // Minion alarm
+  const [minionAlarm, setMinionAlarm] = useState<{ from: string } | null>(null);
+  const [showMinionPicker, setShowMinionPicker] = useState(false);
   // Ping Pong
   const [showPongInvite, setShowPongInvite] = useState(false);
   const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
@@ -450,6 +454,11 @@ export default function ChatPage() {
       }
     });
     // Ping Pong invitation/acceptance
+    channel.subscribe("minion-alarm", (msg: Ably.Message) => {
+      const data = msg.data as { from: string; to: string };
+      if (data.to !== nicknameRef.current) return;
+      setMinionAlarm({ from: data.from });
+    });
     channel.subscribe("pong-invite", (msg: Ably.Message) => {
       const data = msg.data as PongInvite;
       if (data.to !== nicknameRef.current) return;
@@ -1673,6 +1682,43 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+          <Popover open={showMinionPicker} onOpenChange={setShowMinionPicker}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Tocar alarme do Minion"
+                className="h-8 w-8 p-0"
+              >
+                <Siren className="h-3.5 w-3.5 text-yellow-500" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" side="top" align="end">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">
+                🚨 Tocar alarme para:
+              </p>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                {onlineUsers.filter((u) => u !== nickname).length === 0 && (
+                  <p className="text-xs text-muted-foreground px-1 py-2">Ninguém online</p>
+                )}
+                {onlineUsers.filter((u) => u !== nickname).map((user) => (
+                  <button
+                    key={user}
+                    type="button"
+                    onClick={() => {
+                      channelRef.current?.publish("minion-alarm", { from: nickname, to: user });
+                      toast.success(`🚨 Alarme enviado para ${user}!`);
+                      setShowMinionPicker(false);
+                    }}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors"
+                  >
+                    {user}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Private chat indicator */}
@@ -1831,6 +1877,10 @@ export default function ChatPage() {
           guestNickname={activePongMatch.guest}
           onClose={() => setActivePongMatch(null)}
         />
+      )}
+
+      {minionAlarm && (
+        <MinionAlarm from={minionAlarm.from} onClose={() => setMinionAlarm(null)} />
       )}
 
     </div>
