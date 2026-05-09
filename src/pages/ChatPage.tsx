@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren } from "lucide-react";
 import {
   PongInviteChooser,
   PongInvitePopup,
@@ -38,6 +38,7 @@ import DrawingCanvas from "@/components/chat/DrawingCanvas";
 import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
+import MinionAlarm from "@/components/chat/MinionAlarm";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -231,6 +232,9 @@ export default function ChatPage() {
   const [activeGuessGame, setActiveGuessGame] = useState<GuessGameData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [privateTo, setPrivateTo] = useState<string | null>(null);
+  // Minion alarm
+  const [minionAlarm, setMinionAlarm] = useState<{ from: string } | null>(null);
+  const [showMinionPicker, setShowMinionPicker] = useState(false);
   // Ping Pong
   const [showPongInvite, setShowPongInvite] = useState(false);
   const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
@@ -450,6 +454,11 @@ export default function ChatPage() {
       }
     });
     // Ping Pong invitation/acceptance
+    channel.subscribe("minion-alarm", (msg: Ably.Message) => {
+      const data = msg.data as { from: string; to: string };
+      if (data.to !== nicknameRef.current) return;
+      setMinionAlarm({ from: data.from });
+    });
     channel.subscribe("pong-invite", (msg: Ably.Message) => {
       const data = msg.data as PongInvite;
       if (data.to !== nicknameRef.current) return;
