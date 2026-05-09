@@ -1,7 +1,46 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, X, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { Music, X, Send, ChevronDown, ChevronUp, Search, Loader2 } from "lucide-react";
+
+const PIPED_INSTANCES = [
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+  "https://pipedapi.reallyaweso.me",
+];
+
+interface SearchResult {
+  id: string;
+  title: string;
+  thumbnail: string;
+  uploader?: string;
+  duration?: number;
+}
+
+async function searchYouTube(query: string): Promise<SearchResult[]> {
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&filter=videos`, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const items = (data.items || []).filter((i: any) => i.url?.includes("watch?v="));
+      return items.slice(0, 12).map((i: any) => ({
+        id: i.url.split("watch?v=")[1].split("&")[0],
+        title: i.title,
+        thumbnail: i.thumbnail,
+        uploader: i.uploaderName,
+        duration: i.duration,
+      }));
+    } catch {}
+  }
+  return [];
+}
+
+function fmtDuration(s?: number) {
+  if (!s || s < 0) return "";
+  const m = Math.floor(s / 60); const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
 
 declare global {
   interface Window {
