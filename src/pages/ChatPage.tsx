@@ -1842,6 +1842,10 @@ export default function ChatPage() {
         />
       )}
 
+      {minionAlarm && (
+        <MinionAlarm from={minionAlarm.from} onClose={() => setMinionAlarm(null)} />
+      )}
+
     </div>
   );
 }
