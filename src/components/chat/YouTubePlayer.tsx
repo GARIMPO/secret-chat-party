@@ -206,13 +206,38 @@ export default function YouTubePlayer({
     }
   }, [seekTo]);
 
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = extractVideoId(linkInput.trim());
+    const trimmed = linkInput.trim();
+    const id = extractVideoId(trimmed);
     if (id) {
       onSubmitLink(id);
       setLinkInput("");
+      return;
     }
+    // Sem URL válida → trata como busca
+    if (trimmed.length > 0) {
+      setSearchQuery(trimmed);
+      setSearchOpen(true);
+      runSearch(trimmed);
+    }
+  };
+
+  const runSearch = async (q: string) => {
+    setSearching(true);
+    const results = await searchYouTube(q);
+    setSearchResults(results);
+    setSearching(false);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) runSearch(searchQuery.trim());
   };
 
   if (!videoId) {
@@ -222,16 +247,77 @@ export default function YouTubePlayer({
           <Music className="h-4 w-4 text-primary shrink-0" />
           <form onSubmit={handleSubmit} className="flex gap-2 flex-1 min-w-0">
             <Input
-              placeholder="Cole link do YouTube..."
+              placeholder="Cole link ou digite para buscar..."
               value={linkInput}
               onChange={(e) => setLinkInput(e.target.value)}
               className="h-8 text-xs flex-1"
             />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              onClick={() => setSearchOpen((v) => !v)}
+              title="Buscar no YouTube"
+            >
+              <Search className="h-3 w-3" />
+            </Button>
             <Button type="submit" size="sm" className="h-8" disabled={!linkInput.trim()}>
               <Send className="h-3 w-3" />
             </Button>
           </form>
         </div>
+
+        {searchOpen && (
+          <div className="mt-2 border border-border rounded-md bg-background p-2">
+            <form onSubmit={handleSearchSubmit} className="flex gap-2 mb-2">
+              <Input
+                placeholder="Buscar vídeos no YouTube..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 text-xs flex-1"
+                autoFocus
+              />
+              <Button type="submit" size="sm" className="h-8" disabled={!searchQuery.trim() || searching}>
+                {searching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+              </Button>
+            </form>
+            {searching && (
+              <p className="text-center text-xs text-muted-foreground py-4">Buscando...</p>
+            )}
+            {!searching && searchResults.length === 0 && searchQuery && (
+              <p className="text-center text-xs text-muted-foreground py-4">Nenhum resultado.</p>
+            )}
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {searchResults.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => {
+                    onSubmitLink(r.id);
+                    setSearchOpen(false);
+                    setLinkInput("");
+                  }}
+                  className="w-full flex gap-2 p-1.5 rounded hover:bg-accent text-left transition-colors"
+                >
+                  <div className="relative shrink-0">
+                    <img src={r.thumbnail} alt="" className="w-20 h-12 object-cover rounded" loading="lazy" />
+                    {r.duration ? (
+                      <span className="absolute bottom-0.5 right-0.5 bg-black/80 text-white text-[9px] px-1 rounded">
+                        {fmtDuration(r.duration)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium line-clamp-2 leading-tight">{r.title}</p>
+                    {r.uploader && (
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{r.uploader}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
