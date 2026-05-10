@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren, BookOpen } from "lucide-react";
 import {
   PongInviteChooser,
   PongInvitePopup,
@@ -39,6 +39,7 @@ import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
+import ScriptureReader from "@/components/chat/ScriptureReader";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -235,6 +236,8 @@ export default function ChatPage() {
   // Minion alarm
   const [minionAlarm, setMinionAlarm] = useState<{ from: string } | null>(null);
   const [showMinionPicker, setShowMinionPicker] = useState(false);
+  // Scripture reader
+  const [showScriptures, setShowScriptures] = useState(false);
   // Ping Pong
   const [showPongInvite, setShowPongInvite] = useState(false);
   const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
@@ -1719,6 +1722,16 @@ export default function ChatPage() {
               </div>
             </PopoverContent>
           </Popover>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            title="Estudar escrituras"
+            onClick={() => setShowScriptures(true)}
+            className="h-8 w-8 p-0"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-primary" />
+          </Button>
         </div>
 
         {/* Private chat indicator */}
@@ -1882,6 +1895,8 @@ export default function ChatPage() {
       {minionAlarm && (
         <MinionAlarm from={minionAlarm.from} onClose={() => setMinionAlarm(null)} />
       )}
+
+      {showScriptures && <ScriptureReader onClose={() => setShowScriptures(false)} />}
 
     </div>
   );
