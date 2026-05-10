@@ -1896,6 +1896,8 @@ export default function ChatPage() {
         <MinionAlarm from={minionAlarm.from} onClose={() => setMinionAlarm(null)} />
       )}
 
+      {showScriptures && <ScriptureReader onClose={() => setShowScriptures(false)} />}
+
     </div>
   );
 }
