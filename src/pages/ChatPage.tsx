@@ -1722,6 +1722,16 @@ export default function ChatPage() {
               </div>
             </PopoverContent>
           </Popover>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            title="Estudar escrituras"
+            onClick={() => setShowScriptures(true)}
+            className="h-8 w-8 p-0"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-primary" />
+          </Button>
         </div>
 
         {/* Private chat indicator */}
