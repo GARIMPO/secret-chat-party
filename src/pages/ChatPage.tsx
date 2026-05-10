@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren } from "lucide-react";
+import { Send, Lock, ArrowLeft, Trash2, Pencil, Music, LogIn, LogOut, DoorOpen, Users, Mail, Globe, Image, UserX, ShieldCheck, Dice6, ImagePlus, MessageSquareLock, X, Puzzle, Gamepad2, Link2, Palette, Check, Siren, BookOpen } from "lucide-react";
 import {
   PongInviteChooser,
   PongInvitePopup,
@@ -39,6 +39,7 @@ import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
+import ScriptureReader from "@/components/chat/ScriptureReader";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -235,6 +236,8 @@ export default function ChatPage() {
   // Minion alarm
   const [minionAlarm, setMinionAlarm] = useState<{ from: string } | null>(null);
   const [showMinionPicker, setShowMinionPicker] = useState(false);
+  // Scripture reader
+  const [showScriptures, setShowScriptures] = useState(false);
   // Ping Pong
   const [showPongInvite, setShowPongInvite] = useState(false);
   const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
