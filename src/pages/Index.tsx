@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Shield } from "lucide-react";
+import { MessageCircle, Shield, BookOpen } from "lucide-react";
+import { ScripturesReader } from "@/components/ScripturesReader";
 
 export default function Index() {
   const navigate = useNavigate();
+  const [scripturesOpen, setScripturesOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -19,9 +22,18 @@ export default function Index() {
         </div>
 
         <div className="space-y-3">
+          <button
+            onClick={() => setScripturesOpen(true)}
+            aria-label="Abrir escrituras"
+            className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 hover:from-primary/25 hover:to-primary/10 hover:scale-105 active:scale-95 transition-all shadow-sm"
+          >
+            <BookOpen className="h-9 w-9 text-primary" strokeWidth={1.5} />
+          </button>
+          <p className="text-xs text-muted-foreground">Escrituras Sagradas</p>
+
           <Button
             variant="outline"
-            className="w-full active:scale-[0.97]"
+            className="w-full active:scale-[0.97] mt-4"
             onClick={() => navigate("/admin")}
           >
             <Shield className="h-4 w-4 mr-2" />
@@ -33,6 +45,8 @@ export default function Index() {
           Para entrar em uma sala, use o link compartilhado pelo admin.
         </p>
       </div>
+
+      <ScripturesReader open={scripturesOpen} onOpenChange={setScripturesOpen} />
     </div>
   );
 }
