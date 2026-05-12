@@ -1,0 +1,145 @@
+{
+  "volumes": [
+    {
+      "name": "Livro de Mórmon",
+      "books": [
+        {
+          "name": "1 Néfi",
+          "slug": "1-nefi",
+          "file": "1-nefi.json",
+          "chapterCount": 22
+        },
+        {
+          "name": "2 Néfi",
+          "slug": "2-nefi",
+          "file": "2-nefi.json",
+          "chapterCount": 33
+        },
+        {
+          "name": "Jacó",
+          "slug": "jaco",
+          "file": "jaco.json",
+          "chapterCount": 7
+        },
+        {
+          "name": "Enos",
+          "slug": "enos",
+          "file": "enos.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Jarom",
+          "slug": "jarom",
+          "file": "jarom.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Ômni",
+          "slug": "omni",
+          "file": "omni.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Palavras de Mórmon",
+          "slug": "palavras-mormon",
+          "file": "palavras-mormon.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Mosias",
+          "slug": "mosias",
+          "file": "mosias.json",
+          "chapterCount": 28
+        },
+        {
+          "name": "Alma",
+          "slug": "alma",
+          "file": "alma.json",
+          "chapterCount": 63
+        },
+        {
+          "name": "Helamã",
+          "slug": "helama",
+          "file": "helama.json",
+          "chapterCount": 16
+        },
+        {
+          "name": "3 Néfi",
+          "slug": "3-nefi",
+          "file": "3-nefi.json",
+          "chapterCount": 30
+        },
+        {
+          "name": "4 Néfi",
+          "slug": "4-nefi",
+          "file": "4-nefi.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Mórmon",
+          "slug": "mormon",
+          "file": "mormon.json",
+          "chapterCount": 9
+        },
+        {
+          "name": "Éter",
+          "slug": "eter",
+          "file": "eter.json",
+          "chapterCount": 15
+        },
+        {
+          "name": "Morôni",
+          "slug": "moroni",
+          "file": "moroni.json",
+          "chapterCount": 10
+        }
+      ]
+    },
+    {
+      "name": "Doutrina e Convênios",
+      "books": [
+        {
+          "name": "Doutrina e Convênios",
+          "slug": "dc",
+          "file": "dc.json",
+          "chapterCount": 136
+        }
+      ]
+    },
+    {
+      "name": "Pérola de Grande Valor",
+      "books": [
+        {
+          "name": "Moisés",
+          "slug": "moises",
+          "file": "moises.json",
+          "chapterCount": 8
+        },
+        {
+          "name": "Abraão",
+          "slug": "abraao",
+          "file": "abraao.json",
+          "chapterCount": 5
+        },
+        {
+          "name": "Joseph Smith—Mateus",
+          "slug": "js-mateus",
+          "file": "js-mateus.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Joseph Smith—História",
+          "slug": "js-historia",
+          "file": "js-historia.json",
+          "chapterCount": 1
+        },
+        {
+          "name": "Regras de Fé",
+          "slug": "regras-fe",
+          "file": "regras-fe.json",
+          "chapterCount": 1
+        }
+      ]
+    }
+  ]
+}
