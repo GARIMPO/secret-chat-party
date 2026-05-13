@@ -236,6 +236,7 @@ export default function ChatPage() {
   // Minion alarm
   const [minionAlarm, setMinionAlarm] = useState<{ from: string } | null>(null);
   const [showMinionPicker, setShowMinionPicker] = useState(false);
+  const [scripturesOpen, setScripturesOpen] = useState(false);
   // Ping Pong
   const [showPongInvite, setShowPongInvite] = useState(false);
   const [pendingPongInvite, setPendingPongInvite] = useState<PongInvite | null>(null);
