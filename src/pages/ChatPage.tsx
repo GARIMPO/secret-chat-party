@@ -1895,6 +1895,8 @@ export default function ChatPage() {
         <MinionAlarm from={minionAlarm.from} onClose={() => setMinionAlarm(null)} />
       )}
 
+      <ScripturesReader open={scripturesOpen} onOpenChange={setScripturesOpen} />
+
     </div>
   );
 }
