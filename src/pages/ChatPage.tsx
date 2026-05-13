@@ -39,6 +39,7 @@ import YouTubePlayer from "@/components/chat/YouTubePlayer";
 import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
+import { ScripturesReader } from "@/components/ScripturesReader";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
