@@ -1764,8 +1764,10 @@ export default function ChatPage() {
                 <MessageSquareLock className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 p-2" side="top" align="start">
-              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">Enviar privado para:</p>
+            <PopoverContent className="w-56 p-2" side="top" align="start">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">
+                Convidar para chat privado:
+              </p>
               <div className="space-y-0.5 max-h-40 overflow-y-auto">
                 {onlineUsers.filter((u) => u !== nickname).length === 0 && (
                   <p className="text-xs text-muted-foreground px-1 py-2">Ninguém online</p>
@@ -1774,29 +1776,17 @@ export default function ChatPage() {
                   <button
                     key={user}
                     type="button"
-                    onClick={() => setPrivateTo(user)}
-                    className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
-                      privateTo === user
-                        ? "bg-primary/15 text-foreground font-medium"
-                        : "text-foreground hover:bg-muted"
-                    }`}
+                    onClick={() => privateChatsRef.current?.invite(user)}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors flex items-center gap-2"
                   >
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                     {user}
                   </button>
                 ))}
-                {privateTo && (
-                  <>
-                    <div className="border-t border-border my-1" />
-                    <button
-                      type="button"
-                      onClick={() => setPrivateTo(null)}
-                      className="w-full text-left text-xs px-2 py-1.5 rounded-md text-destructive hover:bg-muted transition-colors"
-                    >
-                      ✕ Cancelar privado
-                    </button>
-                  </>
-                )}
               </div>
+              <p className="text-[10px] text-muted-foreground mt-2 px-1 leading-tight">
+                A pessoa receberá um convite e poderá aceitar ou recusar.
+              </p>
             </PopoverContent>
           </Popover>
           <Textarea
