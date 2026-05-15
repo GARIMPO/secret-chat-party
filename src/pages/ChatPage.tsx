@@ -1892,6 +1892,13 @@ export default function ChatPage() {
 
       <ScripturesReader open={scripturesOpen} onOpenChange={setScripturesOpen} />
 
+      <PrivateChats
+        ref={privateChatsRef}
+        channel={activeChannel}
+        nickname={nickname}
+        onlineUsers={onlineUsers}
+      />
+
     </div>
   );
 }
