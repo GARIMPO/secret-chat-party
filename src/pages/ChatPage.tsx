@@ -507,6 +507,7 @@ export default function ChatPage() {
       const client = getAblyClient(session.nickname);
       const channel = client.channels.get(`chat-${room}`);
       channelRef.current = channel;
+      setActiveChannel(channel);
 
       subscribeAll(channel);
       setupPresenceAndTyping(channel, session.nickname);
