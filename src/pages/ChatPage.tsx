@@ -265,6 +265,8 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const privateChatsRef = useRef<PrivateChatsHandle>(null);
+  const [activeChannel, setActiveChannel] = useState<Ably.RealtimeChannel | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
