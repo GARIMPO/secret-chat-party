@@ -1,4 +1,15 @@
-import { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import type Ably from "ably";
 import { encryptMessage, decryptMessage } from "@/lib/crypto";
 import { playBeep } from "@/lib/beep";
@@ -14,8 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
-import { MessageSquareLock, Send, X, Minus, Maximize2 } from "lucide-react";
+import { MessageSquareLock, Send, X, Minus } from "lucide-react";
 
 const PM_PASSWORD = "entrar2025";
 
@@ -42,22 +58,34 @@ interface IncomingInvite {
   sessionId: string;
 }
 
-interface Props {
-  channel: Ably.RealtimeChannel | null;
-  nickname: string;
-  onlineUsers: string[];
-}
-
 function pairId(a: string, b: string) {
   return [a, b].sort().join("|");
 }
 
-const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
-  ({ channel, nickname, onlineUsers }, ref) => {
+interface Ctx {
+  sessions: Record<string, Session>;
+  onlineUsers: string[];
+  totalUnread: number;
+  openWindow: (sid: string) => void;
+  closeSession: (sid: string) => void;
+  invite: (target: string) => void;
+}
+
+const PrivateChatsCtx = createContext<Ctx | null>(null);
+
+interface ProviderProps {
+  channel: Ably.RealtimeChannel | null;
+  nickname: string;
+  onlineUsers: string[];
+  children: ReactNode;
+}
+
+export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps>(
+  ({ channel, nickname, onlineUsers, children }, ref) => {
     const [sessions, setSessions] = useState<Record<string, Session>>({});
     const [incoming, setIncoming] = useState<IncomingInvite | null>(null);
     const incomingQueue = useRef<IncomingInvite[]>([]);
-    const sentInvites = useRef<Set<string>>(new Set()); // sessionIds we initiated
+    const sentInvites = useRef<Set<string>>(new Set());
     const nickRef = useRef(nickname);
     nickRef.current = nickname;
 
@@ -72,7 +100,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       const onInvite = (msg: Ably.Message) => {
         const data = msg.data as { from: string; to: string; sessionId: string };
         if (data.to !== nickRef.current) return;
-        // If session already open, auto-accept
         if (sessions[data.sessionId]) {
           channel.publish("pm-invite-response", {
             from: nickRef.current,
@@ -82,13 +109,9 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
           });
           return;
         }
-        // Queue invite
         const inv = { from: data.from, sessionId: data.sessionId };
-        if (incoming) {
-          incomingQueue.current.push(inv);
-        } else {
-          setIncoming(inv);
-        }
+        if (incoming) incomingQueue.current.push(inv);
+        else setIncoming(inv);
         playBeep();
         toast.info(`${data.from} quer iniciar um chat privado`);
       };
@@ -166,7 +189,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
         if (!channel || !target || target === nickname) return;
         const sid = pairId(nickname, target);
         if (sessions[sid]) {
-          // Already open – just unminimize
           setSessions((prev) => ({
             ...prev,
             [sid]: { ...prev[sid], minimized: false, unread: 0 },
@@ -208,25 +230,37 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       showNextIncoming();
     };
 
-    const closeSession = (sid: string) => {
+    const closeSession = useCallback((sid: string) => {
       setSessions((prev) => {
         const next = { ...prev };
         delete next[sid];
         return next;
       });
       sentInvites.current.delete(sid);
-    };
+    }, []);
 
-    const toggleMinimize = (sid: string) => {
-      setSessions((prev) => ({
-        ...prev,
-        [sid]: {
-          ...prev[sid],
-          minimized: !prev[sid].minimized,
-          unread: 0,
-        },
-      }));
-    };
+    const openWindow = useCallback((sid: string) => {
+      setSessions((prev) =>
+        prev[sid]
+          ? { ...prev, [sid]: { ...prev[sid], minimized: false, unread: 0 } }
+          : prev,
+      );
+    }, []);
+
+    const toggleMinimize = useCallback((sid: string) => {
+      setSessions((prev) =>
+        prev[sid]
+          ? {
+              ...prev,
+              [sid]: {
+                ...prev[sid],
+                minimized: !prev[sid].minimized,
+                unread: 0,
+              },
+            }
+          : prev,
+      );
+    }, []);
 
     const sendMessage = (sid: string, text: string) => {
       if (!channel || !text.trim()) return;
@@ -243,15 +277,26 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       channel.publish("pm-msg", msg);
     };
 
-    const openSessions = Object.entries(sessions).filter(
-      ([, s]) => !s.minimized,
-    );
-    const minimizedSessions = Object.entries(sessions).filter(
-      ([, s]) => s.minimized,
+    const totalUnread = useMemo(
+      () => Object.values(sessions).reduce((s, x) => s + x.unread, 0),
+      [sessions],
     );
 
+    const ctxValue: Ctx = {
+      sessions,
+      onlineUsers,
+      totalUnread,
+      openWindow,
+      closeSession,
+      invite,
+    };
+
+    const openSessions = Object.entries(sessions).filter(([, s]) => !s.minimized);
+
     return (
-      <>
+      <PrivateChatsCtx.Provider value={ctxValue}>
+        {children}
+
         {/* Incoming invite dialog */}
         <AlertDialog
           open={!!incoming}
@@ -280,7 +325,7 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Floating private chat windows */}
+        {/* Floating open chat windows */}
         <div className="fixed bottom-4 right-4 z-50 flex items-end gap-3 pointer-events-none">
           {openSessions.map(([sid, sess]) => (
             <PrivateChatWindow
@@ -294,34 +339,83 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
             />
           ))}
         </div>
-
-        {/* Minimized tabs */}
-        {minimizedSessions.length > 0 && (
-          <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2">
-            {minimizedSessions.map(([sid, sess]) => (
-              <button
-                key={sid}
-                onClick={() => toggleMinimize(sid)}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition text-xs font-medium"
-              >
-                <MessageSquareLock className="h-3.5 w-3.5" />
-                {sess.with}
-                {sess.unread > 0 && (
-                  <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[10px] flex items-center justify-center">
-                    {sess.unread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </>
+      </PrivateChatsCtx.Provider>
     );
   },
 );
+PrivateChatsProvider.displayName = "PrivateChatsProvider";
 
-PrivateChats.displayName = "PrivateChats";
-export default PrivateChats;
+export function PrivateChatsTrigger() {
+  const ctx = useContext(PrivateChatsCtx);
+  if (!ctx) return null;
+  const entries = Object.entries(ctx.sessions);
+  const hasAny = entries.length > 0;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title="Chats privados"
+          className="h-8 w-8 p-0 relative"
+        >
+          <MessageSquareLock
+            className={`h-3.5 w-3.5 ${hasAny ? "text-primary" : "text-muted-foreground"}`}
+          />
+          {ctx.totalUnread > 0 && (
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[9px] font-semibold flex items-center justify-center">
+              {ctx.totalUnread}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-2">
+        <p className="text-xs font-semibold px-2 py-1 text-muted-foreground">
+          Chats privados ativos
+        </p>
+        {!hasAny && (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Nenhum chat privado ativo
+          </p>
+        )}
+        <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+          {entries.map(([sid, sess]) => {
+            const isOnline = ctx.onlineUsers.includes(sess.with);
+            return (
+              <div
+                key={sid}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer group"
+                onClick={() => ctx.openWindow(sid)}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${isOnline ? "bg-green-500" : "bg-muted-foreground/40"}`}
+                />
+                <span className="text-xs flex-1 truncate">{sess.with}</span>
+                {sess.unread > 0 && (
+                  <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[10px] font-semibold flex items-center justify-center">
+                    {sess.unread}
+                  </span>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ctx.closeSession(sid);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                  title="Encerrar chat"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface WindowProps {
   session: Session;
@@ -363,18 +457,10 @@ function PrivateChatWindow({
             {isOnline ? "● online" : "○ offline"} · privado
           </p>
         </div>
-        <button
-          onClick={onMinimize}
-          className="p-1 hover:bg-white/20 rounded"
-          title="Minimizar"
-        >
+        <button onClick={onMinimize} className="p-1 hover:bg-white/20 rounded" title="Minimizar">
           <Minus className="h-3.5 w-3.5" />
         </button>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-white/20 rounded"
-          title="Fechar"
-        >
+        <button onClick={onClose} className="p-1 hover:bg-white/20 rounded" title="Fechar">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -389,10 +475,7 @@ function PrivateChatWindow({
           const isMe = m.from === myNick;
           const text = decryptMessage(m.encrypted, PM_PASSWORD);
           return (
-            <div
-              key={m.id}
-              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-            >
+            <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[80%] px-2.5 py-1.5 rounded-lg text-xs ${
                   isMe
@@ -439,3 +522,7 @@ function PrivateChatWindow({
     </div>
   );
 }
+
+// Backward-compat default export (acts as provider with no children rendered inside).
+const PrivateChats = PrivateChatsProvider;
+export default PrivateChats;

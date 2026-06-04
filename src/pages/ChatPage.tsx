@@ -40,7 +40,7 @@ import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
 import { ScripturesReader } from "@/components/ScripturesReader";
-import PrivateChats, { type PrivateChatsHandle } from "@/components/chat/PrivateChats";
+import { PrivateChatsProvider, PrivateChatsTrigger, type PrivateChatsHandle } from "@/components/chat/PrivateChats";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -1260,6 +1260,12 @@ export default function ChatPage() {
   }
 
   return (
+    <PrivateChatsProvider
+      ref={privateChatsRef}
+      channel={activeChannel}
+      nickname={nickname}
+      onlineUsers={onlineUsers}
+    >
     <div
       className="flex h-[100dvh] flex-col bg-background transition-colors"
       style={
@@ -1736,6 +1742,7 @@ export default function ChatPage() {
           >
             <BookOpen className="h-3.5 w-3.5 text-primary" />
           </Button>
+          <PrivateChatsTrigger />
         </div>
 
         {/* Private chat indicator */}
@@ -1892,13 +1899,7 @@ export default function ChatPage() {
 
       <ScripturesReader open={scripturesOpen} onOpenChange={setScripturesOpen} />
 
-      <PrivateChats
-        ref={privateChatsRef}
-        channel={activeChannel}
-        nickname={nickname}
-        onlineUsers={onlineUsers}
-      />
-
     </div>
+    </PrivateChatsProvider>
   );
 }
