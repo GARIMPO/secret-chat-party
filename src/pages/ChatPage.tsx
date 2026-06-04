@@ -1742,6 +1742,7 @@ export default function ChatPage() {
           >
             <BookOpen className="h-3.5 w-3.5 text-primary" />
           </Button>
+          <PrivateChatsTrigger />
         </div>
 
         {/* Private chat indicator */}
