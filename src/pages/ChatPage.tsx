@@ -1260,6 +1260,12 @@ export default function ChatPage() {
   }
 
   return (
+    <PrivateChatsProvider
+      ref={privateChatsRef}
+      channel={activeChannel}
+      nickname={nickname}
+      onlineUsers={onlineUsers}
+    >
     <div
       className="flex h-[100dvh] flex-col bg-background transition-colors"
       style={
