@@ -31,7 +31,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { MessageSquareLock, Send, X, Minus } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { MessageSquareLock, Send, X } from "lucide-react";
 
 const PM_PASSWORD = "entrar2025";
 
