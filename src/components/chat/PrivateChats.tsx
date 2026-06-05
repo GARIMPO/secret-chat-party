@@ -19,9 +19,19 @@ import { MessageSquareLock, Send, X, Minus, Maximize2 } from "lucide-react";
 
 const PM_PASSWORD = "entrar2025";
 
+export interface PrivateSessionSummary {
+  sessionId: string;
+  with: string;
+  unread: number;
+  minimized: boolean;
+}
+
 export interface PrivateChatsHandle {
   invite: (target: string) => void;
+  focus: (sessionId: string) => void;
+  close: (sessionId: string) => void;
 }
+
 
 interface PMMessage {
   id: string;
