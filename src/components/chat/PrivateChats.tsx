@@ -332,26 +332,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
           ))}
         </div>
 
-        {/* Minimized tabs */}
-        {minimizedSessions.length > 0 && (
-          <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2">
-            {minimizedSessions.map(([sid, sess]) => (
-              <button
-                key={sid}
-                onClick={() => toggleMinimize(sid)}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition text-xs font-medium"
-              >
-                <MessageSquareLock className="h-3.5 w-3.5" />
-                {sess.with}
-                {sess.unread > 0 && (
-                  <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[10px] flex items-center justify-center">
-                    {sess.unread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </>
     );
   },
