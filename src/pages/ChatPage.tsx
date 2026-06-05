@@ -1970,6 +1970,7 @@ export default function ChatPage() {
         channel={activeChannel}
         nickname={nickname}
         onlineUsers={onlineUsers}
+        onSessionsChange={setPrivateSessions}
       />
 
     </div>
