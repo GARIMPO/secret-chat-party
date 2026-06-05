@@ -40,7 +40,7 @@ import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
 import { ScripturesReader } from "@/components/ScripturesReader";
-import PrivateChats, { type PrivateChatsHandle } from "@/components/chat/PrivateChats";
+import PrivateChats, { type PrivateChatsHandle, type PrivateSessionSummary } from "@/components/chat/PrivateChats";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -267,6 +267,8 @@ export default function ChatPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const privateChatsRef = useRef<PrivateChatsHandle>(null);
   const [activeChannel, setActiveChannel] = useState<Ably.RealtimeChannel | null>(null);
+  const [privateSessions, setPrivateSessions] = useState<PrivateSessionSummary[]>([]);
+  const [privateListOpen, setPrivateListOpen] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1736,6 +1738,77 @@ export default function ChatPage() {
           >
             <BookOpen className="h-3.5 w-3.5 text-primary" />
           </Button>
+          {privateSessions.length > 0 && (
+            <Popover open={privateListOpen} onOpenChange={setPrivateListOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  title="Meus chats privados"
+                  className="h-8 w-8 p-0 relative"
+                >
+                  <MessageSquareLock className="h-3.5 w-3.5 text-primary" />
+                  {privateSessions.reduce((s, x) => s + x.unread, 0) > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[9px] font-bold flex items-center justify-center">
+                      {privateSessions.reduce((s, x) => s + x.unread, 0)}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-2" side="bottom" align="end">
+                <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 px-1">
+                  🔒 Chats privados ativos
+                </p>
+                <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                  {privateSessions.map((s) => (
+                    <div
+                      key={s.sessionId}
+                      className="flex items-center gap-1.5 group"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          privateChatsRef.current?.focus(s.sessionId);
+                          setPrivateListOpen(false);
+                        }}
+                        className="flex-1 flex items-center justify-between text-left text-xs px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              onlineUsers.includes(s.with)
+                                ? "bg-green-500"
+                                : "bg-muted-foreground"
+                            }`}
+                          />
+                          {s.with}
+                          {s.minimized && (
+                            <span className="text-[9px] text-muted-foreground">
+                              (minimizado)
+                            </span>
+                          )}
+                        </span>
+                        {s.unread > 0 && (
+                          <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[9px] font-bold flex items-center justify-center">
+                            {s.unread}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => privateChatsRef.current?.close(s.sessionId)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+                        title="Fechar chat"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* Private chat indicator */}
@@ -1897,6 +1970,7 @@ export default function ChatPage() {
         channel={activeChannel}
         nickname={nickname}
         onlineUsers={onlineUsers}
+        onSessionsChange={setPrivateSessions}
       />
 
     </div>

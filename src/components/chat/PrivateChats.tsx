@@ -19,9 +19,19 @@ import { MessageSquareLock, Send, X, Minus, Maximize2 } from "lucide-react";
 
 const PM_PASSWORD = "entrar2025";
 
+export interface PrivateSessionSummary {
+  sessionId: string;
+  with: string;
+  unread: number;
+  minimized: boolean;
+}
+
 export interface PrivateChatsHandle {
   invite: (target: string) => void;
+  focus: (sessionId: string) => void;
+  close: (sessionId: string) => void;
 }
+
 
 interface PMMessage {
   id: string;
@@ -46,6 +56,7 @@ interface Props {
   channel: Ably.RealtimeChannel | null;
   nickname: string;
   onlineUsers: string[];
+  onSessionsChange?: (sessions: PrivateSessionSummary[]) => void;
 }
 
 function pairId(a: string, b: string) {
@@ -53,7 +64,7 @@ function pairId(a: string, b: string) {
 }
 
 const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
-  ({ channel, nickname, onlineUsers }, ref) => {
+  ({ channel, nickname, onlineUsers, onSessionsChange }, ref) => {
     const [sessions, setSessions] = useState<Record<string, Session>>({});
     const [incoming, setIncoming] = useState<IncomingInvite | null>(null);
     const incomingQueue = useRef<IncomingInvite[]>([]);
@@ -184,7 +195,41 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       [channel, nickname, sessions],
     );
 
-    useImperativeHandle(ref, () => ({ invite }), [invite]);
+    const closeSession = useCallback((sid: string) => {
+      setSessions((prev) => {
+        const next = { ...prev };
+        delete next[sid];
+        return next;
+      });
+      sentInvites.current.delete(sid);
+    }, []);
+
+    const focusSession = useCallback((sid: string) => {
+      setSessions((prev) => {
+        if (!prev[sid]) return prev;
+        return { ...prev, [sid]: { ...prev[sid], minimized: false, unread: 0 } };
+      });
+    }, []);
+
+    useImperativeHandle(
+      ref,
+      () => ({ invite, focus: focusSession, close: closeSession }),
+      [invite, focusSession, closeSession],
+    );
+
+    // Emit sessions summary to parent
+    useEffect(() => {
+      if (!onSessionsChange) return;
+      const summary: PrivateSessionSummary[] = Object.entries(sessions).map(
+        ([sessionId, s]) => ({
+          sessionId,
+          with: s.with,
+          unread: s.unread,
+          minimized: s.minimized,
+        }),
+      );
+      onSessionsChange(summary);
+    }, [sessions, onSessionsChange]);
 
     const respondInvite = (accepted: boolean) => {
       if (!incoming || !channel) return;
@@ -208,14 +253,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       showNextIncoming();
     };
 
-    const closeSession = (sid: string) => {
-      setSessions((prev) => {
-        const next = { ...prev };
-        delete next[sid];
-        return next;
-      });
-      sentInvites.current.delete(sid);
-    };
 
     const toggleMinimize = (sid: string) => {
       setSessions((prev) => ({
@@ -246,9 +283,7 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
     const openSessions = Object.entries(sessions).filter(
       ([, s]) => !s.minimized,
     );
-    const minimizedSessions = Object.entries(sessions).filter(
-      ([, s]) => s.minimized,
-    );
+
 
     return (
       <>
@@ -281,7 +316,7 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
         </AlertDialog>
 
         {/* Floating private chat windows */}
-        <div className="fixed bottom-4 right-4 z-50 flex items-end gap-3 pointer-events-none">
+        <div className="fixed bottom-4 right-4 z-50 flex flex-row-reverse flex-wrap-reverse items-end gap-3 pointer-events-none max-w-[calc(100vw-2rem)]">
           {openSessions.map(([sid, sess]) => (
             <PrivateChatWindow
               key={sid}
@@ -295,26 +330,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
           ))}
         </div>
 
-        {/* Minimized tabs */}
-        {minimizedSessions.length > 0 && (
-          <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2">
-            {minimizedSessions.map(([sid, sess]) => (
-              <button
-                key={sid}
-                onClick={() => toggleMinimize(sid)}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition text-xs font-medium"
-              >
-                <MessageSquareLock className="h-3.5 w-3.5" />
-                {sess.with}
-                {sess.unread > 0 && (
-                  <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[10px] flex items-center justify-center">
-                    {sess.unread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </>
     );
   },
