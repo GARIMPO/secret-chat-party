@@ -195,7 +195,41 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       [channel, nickname, sessions],
     );
 
-    useImperativeHandle(ref, () => ({ invite }), [invite]);
+    const closeSession = useCallback((sid: string) => {
+      setSessions((prev) => {
+        const next = { ...prev };
+        delete next[sid];
+        return next;
+      });
+      sentInvites.current.delete(sid);
+    }, []);
+
+    const focusSession = useCallback((sid: string) => {
+      setSessions((prev) => {
+        if (!prev[sid]) return prev;
+        return { ...prev, [sid]: { ...prev[sid], minimized: false, unread: 0 } };
+      });
+    }, []);
+
+    useImperativeHandle(
+      ref,
+      () => ({ invite, focus: focusSession, close: closeSession }),
+      [invite, focusSession, closeSession],
+    );
+
+    // Emit sessions summary to parent
+    useEffect(() => {
+      if (!onSessionsChange) return;
+      const summary: PrivateSessionSummary[] = Object.entries(sessions).map(
+        ([sessionId, s]) => ({
+          sessionId,
+          with: s.with,
+          unread: s.unread,
+          minimized: s.minimized,
+        }),
+      );
+      onSessionsChange(summary);
+    }, [sessions, onSessionsChange]);
 
     const respondInvite = (accepted: boolean) => {
       if (!incoming || !channel) return;
