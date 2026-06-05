@@ -253,14 +253,6 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
       showNextIncoming();
     };
 
-    const closeSession = (sid: string) => {
-      setSessions((prev) => {
-        const next = { ...prev };
-        delete next[sid];
-        return next;
-      });
-      sentInvites.current.delete(sid);
-    };
 
     const toggleMinimize = (sid: string) => {
       setSessions((prev) => ({
