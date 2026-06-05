@@ -56,6 +56,7 @@ interface Props {
   channel: Ably.RealtimeChannel | null;
   nickname: string;
   onlineUsers: string[];
+  onSessionsChange?: (sessions: PrivateSessionSummary[]) => void;
 }
 
 function pairId(a: string, b: string) {
