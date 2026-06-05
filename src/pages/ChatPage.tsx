@@ -40,7 +40,7 @@ import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
 import { ScripturesReader } from "@/components/ScripturesReader";
-import { PrivateChatsProvider, PrivateChatsTrigger, type PrivateChatsHandle } from "@/components/chat/PrivateChats";
+import { PrivateChatsProvider, PrivateChatsTrigger, PrivateChatsAccordion, type PrivateChatsHandle } from "@/components/chat/PrivateChats";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
