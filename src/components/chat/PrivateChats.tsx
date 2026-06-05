@@ -316,7 +316,7 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
         </AlertDialog>
 
         {/* Floating private chat windows */}
-        <div className="fixed bottom-4 right-4 z-50 flex items-end gap-3 pointer-events-none">
+        <div className="fixed bottom-4 right-4 z-50 flex flex-row-reverse flex-wrap-reverse items-end gap-3 pointer-events-none max-w-[calc(100vw-2rem)]">
           {openSessions.map(([sid, sess]) => (
             <PrivateChatWindow
               key={sid}
