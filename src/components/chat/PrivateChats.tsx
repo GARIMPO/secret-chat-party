@@ -30,13 +30,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { toast } from "sonner";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { toast } from "sonner";
 import { MessageSquareLock, Send, X } from "lucide-react";
 
 const PM_PASSWORD = "entrar2025";
@@ -55,7 +55,6 @@ interface PMMessage {
 interface Session {
   with: string;
   messages: PMMessage[];
-  minimized: boolean;
   unread: number;
 }
 
@@ -72,8 +71,10 @@ interface Ctx {
   sessions: Record<string, Session>;
   onlineUsers: string[];
   totalUnread: number;
-  openWindow: (sid: string) => void;
+  myNick: string;
+  clearUnread: (sid: string) => void;
   closeSession: (sid: string) => void;
+  sendMessage: (sid: string, text: string) => void;
   invite: (target: string) => void;
 }
 
@@ -137,7 +138,6 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
             [data.sessionId]: prev[data.sessionId] || {
               with: data.from,
               messages: [],
-              minimized: false,
               unread: 0,
             },
           }));
@@ -171,8 +171,7 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
                 ...sess.messages,
                 { id: data.id, from: data.from, encrypted: data.encrypted, ts: data.ts },
               ],
-              unread:
-                isIncoming && sess.minimized ? sess.unread + 1 : sess.unread,
+              unread: isIncoming ? sess.unread + 1 : sess.unread,
             },
           };
         });
@@ -197,7 +196,7 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
         if (sessions[sid]) {
           setSessions((prev) => ({
             ...prev,
-            [sid]: { ...prev[sid], minimized: false, unread: 0 },
+            [sid]: { ...prev[sid], unread: 0 },
           }));
           return;
         }
@@ -228,7 +227,6 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
           [incoming.sessionId]: prev[incoming.sessionId] || {
             with: incoming.from,
             messages: [],
-            minimized: false,
             unread: 0,
           },
         }));
@@ -245,43 +243,31 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
       sentInvites.current.delete(sid);
     }, []);
 
-    const openWindow = useCallback((sid: string) => {
+    const clearUnread = useCallback((sid: string) => {
       setSessions((prev) =>
-        prev[sid]
-          ? { ...prev, [sid]: { ...prev[sid], minimized: false, unread: 0 } }
+        prev[sid] && prev[sid].unread > 0
+          ? { ...prev, [sid]: { ...prev[sid], unread: 0 } }
           : prev,
       );
     }, []);
 
-    const toggleMinimize = useCallback((sid: string) => {
-      setSessions((prev) =>
-        prev[sid]
-          ? {
-              ...prev,
-              [sid]: {
-                ...prev[sid],
-                minimized: !prev[sid].minimized,
-                unread: 0,
-              },
-            }
-          : prev,
-      );
-    }, []);
-
-    const sendMessage = (sid: string, text: string) => {
-      if (!channel || !text.trim()) return;
-      const sess = sessions[sid];
-      if (!sess) return;
-      const msg = {
-        sessionId: sid,
-        from: nickname,
-        to: sess.with,
-        encrypted: encryptMessage(text.trim(), PM_PASSWORD),
-        id: crypto.randomUUID(),
-        ts: Date.now(),
-      };
-      channel.publish("pm-msg", msg);
-    };
+    const sendMessage = useCallback(
+      (sid: string, text: string) => {
+        if (!channel || !text.trim()) return;
+        const sess = sessions[sid];
+        if (!sess) return;
+        const msg = {
+          sessionId: sid,
+          from: nickname,
+          to: sess.with,
+          encrypted: encryptMessage(text.trim(), PM_PASSWORD),
+          id: crypto.randomUUID(),
+          ts: Date.now(),
+        };
+        channel.publish("pm-msg", msg);
+      },
+      [channel, nickname, sessions],
+    );
 
     const totalUnread = useMemo(
       () => Object.values(sessions).reduce((s, x) => s + x.unread, 0),
@@ -292,18 +278,17 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
       sessions,
       onlineUsers,
       totalUnread,
-      openWindow,
+      myNick: nickname,
+      clearUnread,
       closeSession,
+      sendMessage,
       invite,
     };
-
-    const openSessions = Object.entries(sessions).filter(([, s]) => !s.minimized);
 
     return (
       <PrivateChatsCtx.Provider value={ctxValue}>
         {children}
 
-        {/* Incoming invite dialog */}
         <AlertDialog
           open={!!incoming}
           onOpenChange={(o) => {
@@ -330,21 +315,6 @@ export const PrivateChatsProvider = forwardRef<PrivateChatsHandle, ProviderProps
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Floating open chat windows */}
-        <div className="fixed bottom-4 right-4 z-50 flex items-end gap-3 pointer-events-none">
-          {openSessions.map(([sid, sess]) => (
-            <PrivateChatWindow
-              key={sid}
-              session={sess}
-              myNick={nickname}
-              isOnline={onlineUsers.includes(sess.with)}
-              onClose={() => closeSession(sid)}
-              onMinimize={() => toggleMinimize(sid)}
-              onSend={(text) => sendMessage(sid, text)}
-            />
-          ))}
-        </div>
       </PrivateChatsCtx.Provider>
     );
   },
@@ -392,8 +362,7 @@ export function PrivateChatsTrigger() {
             return (
               <div
                 key={sid}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer group"
-                onClick={() => ctx.openWindow(sid)}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted group"
               >
                 <span
                   className={`h-2 w-2 rounded-full ${isOnline ? "bg-green-500" : "bg-muted-foreground/40"}`}
@@ -423,23 +392,80 @@ export function PrivateChatsTrigger() {
   );
 }
 
-interface WindowProps {
+export function PrivateChatsAccordion() {
+  const ctx = useContext(PrivateChatsCtx);
+  const [openItem, setOpenItem] = useState<string>("");
+
+  if (!ctx) return null;
+  const entries = Object.entries(ctx.sessions);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="border-b border-border bg-muted/30">
+      <Accordion
+        type="single"
+        collapsible
+        value={openItem}
+        onValueChange={(v) => {
+          setOpenItem(v);
+          if (v) ctx.clearUnread(v);
+        }}
+        className="w-full"
+      >
+        {entries.map(([sid, sess]) => {
+          const isOnline = ctx.onlineUsers.includes(sess.with);
+          return (
+            <AccordionItem key={sid} value={sid} className="border-b last:border-b-0">
+              <div className="flex items-center pr-2">
+                <AccordionTrigger className="flex-1 px-3 py-2 hover:no-underline">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <MessageSquareLock className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span
+                      className={`h-2 w-2 rounded-full shrink-0 ${
+                        isOnline ? "bg-green-500" : "bg-muted-foreground/40"
+                      }`}
+                    />
+                    <span className="text-xs font-medium truncate">{sess.with}</span>
+                    {sess.unread > 0 && (
+                      <span className="bg-destructive text-destructive-foreground rounded-full h-4 min-w-4 px-1 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                        {sess.unread}
+                      </span>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ctx.closeSession(sid);
+                  }}
+                  className="p-1 text-muted-foreground hover:text-destructive shrink-0"
+                  title="Encerrar chat"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <AccordionContent className="pb-0">
+                <PrivateChatPanel
+                  session={sess}
+                  myNick={ctx.myNick}
+                  onSend={(text) => ctx.sendMessage(sid, text)}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+    </div>
+  );
+}
+
+interface PanelProps {
   session: Session;
   myNick: string;
-  isOnline: boolean;
-  onClose: () => void;
-  onMinimize: () => void;
   onSend: (text: string) => void;
 }
 
-function PrivateChatWindow({
-  session,
-  myNick,
-  isOnline,
-  onClose,
-  onMinimize,
-  onSend,
-}: WindowProps) {
+function PrivateChatPanel({ session, myNick, onSend }: PanelProps) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -454,24 +480,8 @@ function PrivateChatWindow({
   };
 
   return (
-    <div className="pointer-events-auto w-72 sm:w-80 h-96 rounded-lg border border-border bg-background shadow-2xl flex flex-col overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground">
-        <MessageSquareLock className="h-3.5 w-3.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold truncate">{session.with}</p>
-          <p className="text-[10px] opacity-80">
-            {isOnline ? "● online" : "○ offline"} · privado
-          </p>
-        </div>
-        <button onClick={onMinimize} className="p-1 hover:bg-white/20 rounded" title="Minimizar">
-          <Minus className="h-3.5 w-3.5" />
-        </button>
-        <button onClick={onClose} className="p-1 hover:bg-white/20 rounded" title="Fechar">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-muted/20">
+    <div className="flex flex-col bg-background border-t border-border">
+      <div className="max-h-56 overflow-y-auto p-2 space-y-1.5">
         {session.messages.length === 0 && (
           <p className="text-[11px] text-muted-foreground text-center py-4">
             Início do chat privado com {session.with}
@@ -529,6 +539,5 @@ function PrivateChatWindow({
   );
 }
 
-// Backward-compat default export (acts as provider with no children rendered inside).
 const PrivateChats = PrivateChatsProvider;
 export default PrivateChats;
