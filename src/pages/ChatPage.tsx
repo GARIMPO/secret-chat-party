@@ -40,7 +40,7 @@ import MoodPicker from "@/components/chat/MoodPicker";
 import LetterComposer from "@/components/chat/LetterComposer";
 import MinionAlarm from "@/components/chat/MinionAlarm";
 import { ScripturesReader } from "@/components/ScripturesReader";
-import { PrivateChatsProvider, PrivateChatsTrigger, type PrivateChatsHandle } from "@/components/chat/PrivateChats";
+import { PrivateChatsProvider, PrivateChatsTrigger, PrivateChatsAccordion, type PrivateChatsHandle } from "@/components/chat/PrivateChats";
 import DiceGame from "@/components/chat/DiceGame";
 import {
   ImageGuessGameCreator,
@@ -1479,6 +1479,8 @@ export default function ChatPage() {
           initialTime={ytVideo.currentTime}
         />
       )}
+
+      <PrivateChatsAccordion />
 
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
         {messages.length === 0 && (
