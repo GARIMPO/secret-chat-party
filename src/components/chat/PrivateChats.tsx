@@ -283,9 +283,7 @@ const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
     const openSessions = Object.entries(sessions).filter(
       ([, s]) => !s.minimized,
     );
-    const minimizedSessions = Object.entries(sessions).filter(
-      ([, s]) => s.minimized,
-    );
+
 
     return (
       <>
