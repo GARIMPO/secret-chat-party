@@ -267,6 +267,8 @@ export default function ChatPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const privateChatsRef = useRef<PrivateChatsHandle>(null);
   const [activeChannel, setActiveChannel] = useState<Ably.RealtimeChannel | null>(null);
+  const [privateSessions, setPrivateSessions] = useState<PrivateSessionSummary[]>([]);
+  const [privateListOpen, setPrivateListOpen] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
