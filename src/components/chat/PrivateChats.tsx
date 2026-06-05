@@ -64,7 +64,7 @@ function pairId(a: string, b: string) {
 }
 
 const PrivateChats = forwardRef<PrivateChatsHandle, Props>(
-  ({ channel, nickname, onlineUsers }, ref) => {
+  ({ channel, nickname, onlineUsers, onSessionsChange }, ref) => {
     const [sessions, setSessions] = useState<Record<string, Session>>({});
     const [incoming, setIncoming] = useState<IncomingInvite | null>(null);
     const incomingQueue = useRef<IncomingInvite[]>([]);
