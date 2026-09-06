@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GifPickerProps {
   onSelect: (url: string) => void;
@@ -13,32 +12,31 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   const [query, setQuery] = useState("");
   const [gifs, setGifs] = useState<{ url: string; preview: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      fetchGifs(query || "trending");
+      fetchGifs(query);
     }, 400);
     return () => clearTimeout(timeout);
   }, [query]);
 
   const fetchGifs = async (q: string) => {
     setLoading(true);
+    setError(false);
     try {
-      const endpoint = q === "trending"
-        ? `https://tenor.googleapis.com/v2/featured?key=${TENOR_API_KEY}&limit=20&media_filter=tinygif,gif&contentfilter=off`
-        : `https://tenor.googleapis.com/v2/search?key=${TENOR_API_KEY}&q=${encodeURIComponent(q)}&limit=20&media_filter=tinygif,gif&contentfilter=off`;
-      
-      const res = await fetch(endpoint);
-      const data = await res.json();
-      
-      const results = (data.results || []).map((r: any) => ({
-        url: r.media_formats?.gif?.url || r.media_formats?.tinygif?.url || "",
-        preview: r.media_formats?.tinygif?.url || r.media_formats?.gif?.url || "",
-      })).filter((g: any) => g.url);
-      
-      setGifs(results);
+      const params = new URLSearchParams({ customer_id: "chat-app" });
+      if (q.trim()) params.set("q", q.trim());
+
+      const { data, error: fnError } = await supabase.functions.invoke(`klipy-gifs?${params}`, {
+        method: "GET",
+      });
+
+      if (fnError) throw fnError;
+      setGifs(data?.gifs ?? []);
     } catch {
       setGifs([]);
+      setError(true);
     }
     setLoading(false);
   };
@@ -58,6 +56,10 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
       <ScrollArea className="h-72">
         {loading ? (
           <p className="text-center text-xs text-muted-foreground py-8">Carregando...</p>
+        ) : error ? (
+          <p className="text-center text-xs text-muted-foreground py-8">Não foi possível carregar os GIFs.</p>
+        ) : gifs.length === 0 ? (
+          <p className="text-center text-xs text-muted-foreground py-8">Nenhum GIF encontrado.</p>
         ) : (
           <div className="grid grid-cols-2 gap-1 p-2">
             {gifs.map((gif, i) => (
@@ -76,7 +78,7 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
         )}
       </ScrollArea>
       <div className="text-center py-1 border-t border-border">
-        <span className="text-[10px] text-muted-foreground">Powered by Tenor</span>
+        <span className="text-[10px] text-muted-foreground">Powered by Klipy</span>
       </div>
     </div>
   );
