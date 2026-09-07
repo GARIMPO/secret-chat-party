@@ -1,6 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/klipy";
+const KLIPY_API_BASE = "https://api.klipy.com/api/v1";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -8,9 +8,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const KLIPY_API_KEY = Deno.env.get("KLIPY_API_KEY");
-    if (!LOVABLE_API_KEY || !KLIPY_API_KEY) {
+    const KLIPY_APP_KEY = Deno.env.get("KLIPY_APP_KEY");
+    if (!KLIPY_APP_KEY) {
       throw new Error("GIF service is not configured");
     }
 
@@ -26,16 +25,13 @@ Deno.serve(async (req) => {
     });
     if (q) params.set("q", q);
 
-    const response = await fetch(`${GATEWAY_URL}/gifs/${endpoint}?${params}`, {
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": KLIPY_API_KEY,
-      },
-    });
+    const response = await fetch(
+      `${KLIPY_API_BASE}/${KLIPY_APP_KEY}/gifs/${endpoint}?${params}`,
+    );
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`Klipy gateway failed [${response.status}]: ${errorBody}`);
+      console.error(`Klipy request failed [${response.status}]: ${errorBody}`);
       return new Response(
         JSON.stringify({ error: "GIF provider request failed", status: response.status }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -43,7 +39,7 @@ Deno.serve(async (req) => {
     }
 
     const data = await response.json();
-    if (!data.result) {
+    if (data.result === false) {
       console.error(`Klipy error: ${JSON.stringify(data)}`);
       return new Response(JSON.stringify({ error: "GIF provider error" }), {
         status: 502,
